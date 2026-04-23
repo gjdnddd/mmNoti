@@ -243,6 +243,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .trade-act-btn { background: none; border: none; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
 .trade-edit-btn { color: #60a5fa; }
 .trade-del-btn2 { color: #f87171; }
+
+/* ── 예수금 계산기 ── */
+.fund-row { display: none; padding: 3px 16px 3px 42px; justify-content: space-between; align-items: center; }
+.fund-label { font-size: 11px; color: var(--text3); }
+.fund-amount { font-size: 12px; font-weight: 700; color: #4ade80; }
+.fund-toggle-btn { margin-left: auto; background: none; border: 0.5px solid rgba(34,197,94,0.35); border-radius: 4px; color: #4ade80; font-size: 11px; padding: 2px 8px; cursor: pointer; }
+
+/* ── 주문 검증 ── */
+.verify-result { margin: 0 16px 10px; background: var(--bg2); border-radius: var(--radius); padding: 14px; }
+.vr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.vr-badge-ok { background: rgba(34,197,94,0.2); color: #4ade80; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+.vr-badge-warn { background: rgba(245,200,66,0.2); color: #fbbf24; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+.vr-badge-err { background: rgba(239,68,68,0.2); color: #f87171; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+.vr-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 0.5px solid var(--bg3); }
+.vr-row:last-child { border-bottom: none; }
+.vr-key { color: var(--text3); }
+.vr-val { color: var(--text1); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -269,6 +286,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="tab-item" onclick="switchTab('settings')">
       <div class="tab-icon">⚙️</div>
       <div class="tab-label">설정</div>
+    </div>
+    <div class="tab-item" onclick="switchTab('verify')">
+      <div class="tab-icon">🔍</div>
+      <div class="tab-label">검증</div>
     </div>
   </div>
 
@@ -514,6 +535,28 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div style="height:20px"></div>
   </div>
 
+  <!-- ══════════════ 주문 검증 ══════════════ -->
+  <div id="screen-verify" class="screen">
+    <div class="topbar"><span class="topbar-title">주문 검증</span></div>
+    <div class="card">
+      <div class="card-title">예약매매 내역 붙여넣기</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">HTS 엑셀 추출 내용을 그대로 붙여넣으세요 (헤더 포함/미포함 모두 가능)</div>
+      <textarea class="textarea" id="verify-text" placeholder="예약번호&#9;예약일자&#9;예약구분&#9;주문시간&#9;종목코드&#9;종목명&#9;매매구분&#9;예약수량&#9;예약가격..." style="min-height:130px;font-size:12px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-primary" style="flex:2" onclick="runVerify()">검증하기</button>
+        <button class="btn-secondary" style="flex:1" onclick="clearVerify()">초기화</button>
+      </div>
+    </div>
+    <div id="verify-summary" style="display:none" class="card" style="padding:12px 16px">
+      <div class="grid3">
+        <div class="metric"><div class="m-label">총 주문</div><div class="m-val" id="vr-total">-</div></div>
+        <div class="metric"><div class="m-label">정상</div><div class="m-val" style="color:#4ade80" id="vr-ok">-</div></div>
+        <div class="metric"><div class="m-label">불일치</div><div class="m-val" style="color:#f87171" id="vr-err">-</div></div>
+      </div>
+    </div>
+    <div id="verify-results"></div>
+  </div>
+
 </div><!-- /app -->
 
 <!-- ══ 무매 추가/편집 시트 ══ -->
@@ -674,6 +717,7 @@ let deletingId = null;
 let endingId = null;
 let editingTradePortId = null;
 let editingTradeIdx = null;
+let fundToggles = {};
 let parsedTrade = null;
 let histFilter = 'all';
 let cycleFilter = 'all';
@@ -863,19 +907,21 @@ function renderMainCards() {
         <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${prog.toFixed(1)}%;background:${color}"></div></div>
         <div class="pc-pct" style="color:${color}">${prog.toFixed(1)}%</div>
       </div>
-      <div class="section-head"><span class="section-badge s-buy">매수</span></div>
+      <div class="section-head"><span class="section-badge s-buy">매수</span><button class="fund-toggle-btn" data-port="${p.id}" onclick="toggleFunds('${p.id}')">예수금 ▾</button></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
         <div class="o-val">$${p.avg_price.toFixed(2)} × ${avgQty(p)}주</div>
       </div>
+      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1줄까지 필요</span><span class="fund-amount">$${(p.avg_price*avgQty(p)).toFixed(0)}</span></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct">${sr}%</span></div>
         <div class="o-val">$${bp.toFixed(2)} × ${starQty(p)}주</div>
       </div>
+      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~2줄 누적</span><span class="fund-amount">$${(p.avg_price*avgQty(p)+bp*starQty(p)).toFixed(0)}</span></div>
       <div class="ladder-wrap">
         <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
         <div class="ladder-list">
-          ${ladder.map(price => `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${price.toFixed(2)}</span><span class="l-qty">× 1주</span></div>`).join('')}
+          ${ladder.map((lp, i) => { const cum = p.avg_price*avgQty(p)+bp*starQty(p)+ladder.slice(0,i+1).reduce((s,x)=>s+x,0); return `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${lp.toFixed(2)}</span><span class="l-qty">× 1주</span></div><div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~${i+3}줄 누적</span><span class="fund-amount">$${cum.toFixed(0)}</span></div>`; }).join('')}
         </div>
       </div>
       <div class="section-head"><span class="section-badge s-sell">매도</span></div>
@@ -1384,7 +1430,7 @@ function resetSegs() {
 //  NAV
 // ══════════════════════════════════════════════
 function switchTab(tab) {
-  document.querySelectorAll('.tab-item').forEach((t,i) => t.classList.toggle('active', ['main','input','history','cycle','settings'][i] === tab));
+  document.querySelectorAll('.tab-item').forEach((t,i) => t.classList.toggle('active', ['main','input','history','cycle','settings','verify'][i] === tab));
   showScreen(tab);
 }
 
@@ -1564,6 +1610,116 @@ function showSeedLabel(restart) {
 }
 
 function autoEndCycle(p) { checkCycleEnd(p.id); }
+
+// ══════════════════════════════════════════════
+//  예수금 토글
+// ══════════════════════════════════════════════
+function toggleFunds(portId) {
+  fundToggles[portId] = !fundToggles[portId];
+  const open = fundToggles[portId];
+  document.querySelectorAll(`.fund-row[data-port="${portId}"]`).forEach(r => r.style.display = open ? 'flex' : 'none');
+  const btn = document.querySelector(`.fund-toggle-btn[data-port="${portId}"]`);
+  if (btn) btn.textContent = open ? '예수금 ▴' : '예수금 ▾';
+}
+
+// ══════════════════════════════════════════════
+//  주문 검증
+// ══════════════════════════════════════════════
+function clearVerify() {
+  document.getElementById('verify-text').value = '';
+  document.getElementById('verify-results').innerHTML = '';
+  document.getElementById('verify-summary').style.display = 'none';
+}
+
+function runVerify() {
+  const text = document.getElementById('verify-text').value.trim();
+  if (!text) { showToast('내용을 붙여넣어 주세요'); return; }
+  const lines = text.split('\n').filter(l => l.trim());
+  const orders = [];
+  for (const line of lines) {
+    const cols = line.split('\t');
+    if (cols.length < 9) continue;
+    if (cols[4] === '종목코드' || cols[6] === '매매구분') continue;
+    const symbol = (cols[4]||'').trim().toUpperCase();
+    const type = (cols[6]||'').trim();
+    const qty = parseInt((cols[7]||'').replace(/,/g,'')) || 0;
+    const price = parseFloat((cols[8]||'').replace(/,/g,'')) || 0;
+    const orderType = (cols[9]||'').trim();
+    if (!symbol || !type || !qty || !price) continue;
+    orders.push({ symbol, type, qty, price, orderType });
+  }
+  if (!orders.length) { showToast('파싱된 주문이 없어요. 형식을 확인해주세요'); return; }
+  const results = orders.map(o => verifyOrder(o));
+  const okCount = results.filter(r => r.status === 'ok').length;
+  const errCount = results.filter(r => r.status === 'err' || r.status === 'no_port').length;
+  const sumEl = document.getElementById('verify-summary');
+  sumEl.style.display = 'block';
+  document.getElementById('vr-total').textContent = results.length + '건';
+  document.getElementById('vr-ok').textContent = okCount + '건';
+  document.getElementById('vr-err').textContent = (results.length - okCount) + '건';
+  document.getElementById('verify-results').innerHTML = results.map(r => renderVerifyResult(r)).join('');
+}
+
+function verifyOrder(order) {
+  const ports = state.portfolios.filter(p => !p.ended && p.symbol === order.symbol);
+  if (!ports.length) return { ...order, status: 'no_port', detail: '해당 종목 포트폴리오 없음' };
+  const PRICE_TOL = 0.03;
+  for (const p of ports) {
+    const bp = calcBuyP(p);
+    const sp = calcStarP(p);
+    const sellP = calcSellP(p);
+    const ladder = ladderPrices(p);
+    const candidates = order.type === '매수'
+      ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((lp,i) => ({ label:`폭락${i+1}단`, price:lp, qty:1 }))]
+      : [{ label:'25% LOC', price:sp, qty:sell25qty(p) }, { label:'75% 지정가', price:sellP, qty:sell75qty(p) }];
+    for (const cand of candidates) {
+      const pOk = Math.abs(order.price - cand.price) <= PRICE_TOL;
+      const qOk = order.qty === cand.qty;
+      if (pOk && qOk) return { ...order, portName:p.name, status:'ok', matched:cand.label, calcPrice:cand.price, calcQty:cand.qty };
+      if (pOk && !qOk) return { ...order, portName:p.name, status:'qty_warn', matched:cand.label, calcPrice:cand.price, calcQty:cand.qty };
+    }
+    let closest = candidates[0], minDiff = Infinity;
+    for (const cand of candidates) { const d = Math.abs(order.price - cand.price); if (d < minDiff) { minDiff = d; closest = cand; } }
+    return { ...order, portName:p.name, status:'err', matched:closest.label, calcPrice:closest.price, calcQty:closest.qty, priceDiff:minDiff.toFixed(2) };
+  }
+  return { ...order, status:'no_port', detail:'매칭 실패' };
+}
+
+function renderVerifyResult(r) {
+  const typeClass = r.type === '매수' ? 'badge-buy' : 'badge-sell';
+  let badge, rows;
+  if (r.status === 'ok') {
+    badge = `<span class="vr-badge-ok">✓ 정상</span>`;
+    rows = `<div class="vr-row"><span class="vr-key">매칭 항목</span><span class="vr-val">${r.matched}</span></div>
+            <div class="vr-row"><span class="vr-key">계산값</span><span class="vr-val">$${r.calcPrice.toFixed(2)} × ${r.calcQty}주</span></div>`;
+  } else if (r.status === 'qty_warn') {
+    badge = `<span class="vr-badge-warn">⚠ 수량 불일치</span>`;
+    rows = `<div class="vr-row"><span class="vr-key">매칭 항목</span><span class="vr-val">${r.matched}</span></div>
+            <div class="vr-row"><span class="vr-key">가격</span><span class="vr-val">$${r.calcPrice.toFixed(2)} ✓</span></div>
+            <div class="vr-row"><span class="vr-key">수량 불일치</span><span class="vr-val" style="color:#fbbf24">계산 ${r.calcQty}주 / 입력 ${r.qty}주</span></div>`;
+  } else if (r.status === 'err') {
+    badge = `<span class="vr-badge-err">✗ 불일치</span>`;
+    rows = `<div class="vr-row"><span class="vr-key">가장 근접</span><span class="vr-val">${r.matched}</span></div>
+            <div class="vr-row"><span class="vr-key">계산값</span><span class="vr-val">$${r.calcPrice.toFixed(2)} × ${r.calcQty}주</span></div>
+            <div class="vr-row"><span class="vr-key">입력값</span><span class="vr-val" style="color:#f87171">$${r.price.toFixed(2)} × ${r.qty}주</span></div>
+            <div class="vr-row"><span class="vr-key">가격 차이</span><span class="vr-val" style="color:#f87171">$${r.priceDiff}</span></div>`;
+  } else {
+    badge = `<span class="vr-badge-err">✗ 포트 없음</span>`;
+    rows = `<div class="vr-row"><span class="vr-key">사유</span><span class="vr-val">${r.detail||''}</span></div>`;
+  }
+  return `<div class="verify-result">
+    <div class="vr-header">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:15px;font-weight:700;color:var(--text1)">${r.symbol}</span>
+        <span class="badge ${typeClass}">${r.type}</span>
+        ${r.portName ? `<span style="font-size:11px;color:var(--text3)">${r.portName}</span>` : ''}
+      </div>
+      ${badge}
+    </div>
+    <div class="vr-row"><span class="vr-key">예약 주문</span><span class="vr-val">$${r.price.toFixed(2)} × ${r.qty}주</span></div>
+    ${rows}
+  </div>`;
+}
 </script>
 </body>
 </html>
