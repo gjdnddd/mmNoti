@@ -826,8 +826,9 @@ function starQty(p) { const bp = calcBuyP(p); return bp > 0 ? Math.floor(halfM(p
 function sell25qty(p) { return p.hold_qty - Math.floor(p.hold_qty * 0.75); }
 function sell75qty(p) { return Math.floor(p.hold_qty * 0.75); }
 function ladderPrices(p) {
-  const base = calcBuyP(p); if (!base) return [];
-  return Array.from({length:6}, (_,i) => parseFloat((base * (1 - 0.03 * (i+1))).toFixed(2)));
+  const aq = avgQty(p), sq = starQty(p), m = calcM(p);
+  if (!aq || !sq) return [];
+  return Array.from({length:6}, (_,i) => parseFloat((m / (aq + sq + i + 1)).toFixed(2)));
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
