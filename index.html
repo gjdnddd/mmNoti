@@ -826,9 +826,16 @@ function starQty(p) { const bp = calcBuyP(p); return bp > 0 ? Math.floor(halfM(p
 function sell25qty(p) { return p.hold_qty - Math.floor(p.hold_qty * 0.75); }
 function sell75qty(p) { return Math.floor(p.hold_qty * 0.75); }
 function ladderPrices(p) {
-  const aq = avgQty(p), sq = starQty(p), m = calcM(p);
+  const hm = halfM(p), aq = avgQty(p), sq = starQty(p);
   if (!aq || !sq) return [];
-  return Array.from({length:6}, (_,i) => parseFloat((m / (aq + sq + i + 1)).toFixed(2)));
+  const seen = new Set(), prices = [];
+  for (let i = 1; i <= 6; i++) {
+    [aq, sq].forEach(qty => {
+      const lp = parseFloat((hm / (qty + i)).toFixed(2));
+      if (!seen.has(lp)) { seen.add(lp); prices.push(lp); }
+    });
+  }
+  return prices.sort((a, b) => b - a).slice(0, 6);
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
