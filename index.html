@@ -758,9 +758,9 @@ async function syncGist() {
     const content = data.files['mumae_data.json']?.content;
     if (content) {
       const parsed = JSON.parse(content);
-      state.portfolios = parsed.portfolios || state.portfolios;
-      state.pending = parsed.pending || state.pending;
-      state.trades = parsed.trades || state.trades;
+      if (parsed.portfolios?.length > 0) state.portfolios = parsed.portfolios;
+      if (parsed.pending?.length > 0)    state.pending    = parsed.pending;
+      if (parsed.trades?.length > 0)     state.trades     = parsed.trades;
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
