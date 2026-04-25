@@ -755,7 +755,7 @@ async function syncGist() {
     });
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
-    const content = data.files['memae_data.json']?.content;
+    const content = data.files['mumae_data.json']?.content;
     if (content) {
       const parsed = JSON.parse(content);
       state.portfolios = parsed.portfolios || state.portfolios;
@@ -779,7 +779,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'memae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades }, null, 2) } }
     });
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
