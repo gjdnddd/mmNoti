@@ -244,11 +244,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .trade-edit-btn { color: #60a5fa; }
 .trade-del-btn2 { color: #f87171; }
 
-/* ── 예수금 계산기 ── */
-.fund-row { display: none; padding: 3px 16px 3px 42px; justify-content: space-between; align-items: center; }
-.fund-label { font-size: 11px; color: var(--text3); }
-.fund-amount { font-size: 12px; font-weight: 700; color: #4ade80; }
-.fund-toggle-btn { margin-left: auto; background: none; border: 0.5px solid rgba(34,197,94,0.35); border-radius: 4px; color: #4ade80; font-size: 11px; padding: 2px 8px; cursor: pointer; }
 
 /* ── 주문 검증 ── */
 .verify-result { margin: 0 16px 10px; background: var(--bg2); border-radius: var(--radius); padding: 14px; }
@@ -712,7 +707,6 @@ let deletingId = null;
 let endingId = null;
 let editingTradePortId = null;
 let editingTradeIdx = null;
-let fundToggles = {};
 let parsedTrade = null;
 let histFilter = 'all';
 let cycleFilter = 'all';
@@ -828,14 +822,17 @@ function sell75qty(p) { return Math.floor(p.hold_qty * 0.75); }
 function ladderPrices(p) {
   const hm = halfM(p), aq = avgQty(p), sq = starQty(p);
   if (!aq || !sq) return [];
-  const seen = new Set(), prices = [];
+  const priceMap = new Map();
   for (let i = 1; i <= 6; i++) {
-    [aq, sq].forEach(qty => {
+    for (const qty of [sq, aq]) {
       const lp = parseFloat((hm / (qty + i)).toFixed(2));
-      if (!seen.has(lp)) { seen.add(lp); prices.push(lp); }
-    });
+      priceMap.set(lp, (priceMap.get(lp) || 0) + 1);
+    }
   }
-  return prices.sort((a, b) => b - a).slice(0, 6);
+  return [...priceMap.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .slice(0, 6)
+    .map(([price, qty]) => ({ price, qty }));
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
@@ -888,7 +885,6 @@ function renderMainCards() {
     const sp = calcStarP(p);
     const sr = calcStarRate(p).toFixed(2);
     const ladder = ladderPrices(p);
-    const totalFunds = p.avg_price*avgQty(p) + bp*starQty(p) + ladder.reduce((s,lp)=>s+lp,0);
     return `
     <div class="port-card">
       <div class="pc-head">
@@ -906,7 +902,7 @@ function renderMainCards() {
               <div class="metric" style="background:transparent;padding:0"><div class="m-label">평단가</div><div class="m-val" style="font-size:13px">$${p.avg_price.toFixed(2)}</div></div>
               <div class="metric" style="background:transparent;padding:0"><div class="m-label">보유수량</div><div class="m-val" style="font-size:13px">${p.hold_qty}주</div></div>
               <div class="metric" style="background:transparent;padding:0"><div class="m-label">매입금액</div><div class="m-val" style="font-size:13px">$${(p.avg_price*p.hold_qty).toFixed(0)}</div></div>
-              <div class="metric" style="background:transparent;padding:0"><div class="m-label">총예수금</div><div class="m-val" style="font-size:13px;color:#4ade80">$${totalFunds.toFixed(0)}</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">5일 매입금액</div><div class="m-val" style="font-size:13px;color:#4ade80">$${(5*calcM(p)).toFixed(0)}</div></div>
             </div>
           </div>
         </div>
@@ -915,21 +911,19 @@ function renderMainCards() {
         <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${prog.toFixed(1)}%;background:${color}"></div></div>
         <div class="pc-pct" style="color:${color}">${prog.toFixed(1)}%</div>
       </div>
-      <div class="section-head"><span class="section-badge s-buy">매수</span><button class="fund-toggle-btn" data-port="${p.id}" onclick="toggleFunds('${p.id}')">예수금 ▾</button></div>
+      <div class="section-head"><span class="section-badge s-buy">매수</span></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
         <div class="o-val">$${p.avg_price.toFixed(2)} × ${avgQty(p)}주</div>
       </div>
-      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1줄까지 필요</span><span class="fund-amount">$${(p.avg_price*avgQty(p)).toFixed(0)}</span></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct">${sr}%</span></div>
         <div class="o-val">$${bp.toFixed(2)} × ${starQty(p)}주</div>
       </div>
-      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~2줄 누적</span><span class="fund-amount">$${(p.avg_price*avgQty(p)+bp*starQty(p)).toFixed(0)}</span></div>
       <div class="ladder-wrap">
         <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
         <div class="ladder-list">
-          ${ladder.map((lp, i) => { const cum = p.avg_price*avgQty(p)+bp*starQty(p)+ladder.slice(0,i+1).reduce((s,x)=>s+x,0); return `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${lp.toFixed(2)}</span><span class="l-qty">× 1주</span></div><div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~${i+3}줄 누적</span><span class="fund-amount">$${cum.toFixed(0)}</span></div>`; }).join('')}
+          ${ladder.map(l => `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`).join('')}
         </div>
       </div>
       <div class="section-head"><span class="section-badge s-sell">매도</span></div>
@@ -982,8 +976,8 @@ function openDetail(id) {
   document.getElementById('g-sell2-pct').textContent = p.R + '%';
   document.getElementById('g-sell2').textContent = '$' + calcSellP(p).toFixed(2) + ' × ' + sell75qty(p) + '주';
   const ladder = ladderPrices(p);
-  document.getElementById('d-ladder').innerHTML = ladder.map(price =>
-    `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${price.toFixed(2)}</span><span class="l-qty">× 1주</span></div>`
+  document.getElementById('d-ladder').innerHTML = ladder.map(l =>
+    `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`
   ).join('');
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
@@ -1625,16 +1619,6 @@ function showSeedLabel(restart) {
 
 function autoEndCycle(p) { checkCycleEnd(p.id); }
 
-// ══════════════════════════════════════════════
-//  예수금 토글
-// ══════════════════════════════════════════════
-function toggleFunds(portId) {
-  fundToggles[portId] = !fundToggles[portId];
-  const open = fundToggles[portId];
-  document.querySelectorAll(`.fund-row[data-port="${portId}"]`).forEach(r => r.style.display = open ? 'flex' : 'none');
-  const btn = document.querySelector(`.fund-toggle-btn[data-port="${portId}"]`);
-  if (btn) btn.textContent = open ? '예수금 ▴' : '예수금 ▾';
-}
 
 // ══════════════════════════════════════════════
 //  주문 검증 (포트별)
@@ -1687,7 +1671,7 @@ function verifyOrder(order, portId) {
   const PRICE_TOL = 0.03;
   const bp = calcBuyP(p), sp = calcStarP(p), sellP = calcSellP(p), ladder = ladderPrices(p);
   const candidates = order.type === '매수'
-    ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((lp,i) => ({ label:`폭락${i+1}단`, price:lp, qty:1 }))]
+    ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((l,i) => ({ label:`폭락${i+1}단`, price:l.price, qty:l.qty }))]
     : [{ label:'25% LOC', price:sp, qty:sell25qty(p) }, { label:'75% 지정가', price:sellP, qty:sell75qty(p) }];
   for (const cand of candidates) {
     const pOk = Math.abs(order.price - cand.price) <= PRICE_TOL;
