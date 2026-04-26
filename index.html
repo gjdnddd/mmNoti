@@ -719,8 +719,10 @@ window.addEventListener('load', async () => {
   loadLocal();
   if (state.gistToken && state.gistId) {
     await syncGist();
+    await pollMeritz();
   }
   renderAll();
+  setInterval(pollMeritz, 60000);
 });
 
 function loadLocal() {
@@ -789,6 +791,52 @@ async function saveToGist() {
 async function manualSave() {
   await saveToGist();
   showToast('✓ 저장 완료 (' + (state.lastSync||'') + ')');
+}
+
+function parseMeritzItem(item) {
+  const symbolMatch = (item['종목명'] || '').match(/\(([A-Z0-9]+)\)/);
+  const symbol = symbolMatch ? symbolMatch[1] : '';
+  const price  = parseFloat((item['체결단가']  || '0').replace(/USD\s*/i, '').replace(/,/g, ''));
+  const qty    = parseInt((item['체결수량']   || '0').replace(/[^0-9]/g, ''));
+  const amount = parseFloat((item['체결금액'] || '0').replace(/USD\s*/i, '').replace(/,/g, ''));
+  const type   = (item['매매구분'] || '').includes('매도') ? '매도' : '매수';
+  const date   = item['체결일자'] || '';
+  const id     = 'meritz_' + (item['timestamp'] || Date.now());
+  return { id, symbol, type, price, qty, amount, date, source: 'meritz' };
+}
+
+async function pollMeritz() {
+  const token = state.gistToken, gistId = state.gistId;
+  if (!token || !gistId) return;
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const content = data.files['meritz_trades.json']?.content;
+    if (!content) return;
+    let items;
+    try {
+      const parsed = JSON.parse(content);
+      items = Array.isArray(parsed) ? parsed : [parsed];
+    } catch(e) { return; }
+    const existingIds = new Set(state.pending.map(p => p.id));
+    const newItems = items
+      .map(parseMeritzItem)
+      .filter(t => t.symbol && !existingIds.has(t.id));
+    if (!newItems.length) return;
+    state.pending = [...state.pending, ...newItems];
+    renderPending();
+    showToast(`${newItems.length}건 신규 체결 감지`);
+    saveLocal();
+    // 읽은 항목 Gist에서 초기화
+    await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'meritz_trades.json': { content: '[]' } } })
+    });
+  } catch(e) {}
 }
 
 function saveGistConfig() {
