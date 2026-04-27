@@ -830,6 +830,13 @@ async function pollMeritz() {
     renderPending();
     showToast(`${newItems.length}건 신규 체결 감지`);
     saveLocal();
+    if (Notification.permission === 'granted') {
+      new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+      });
+    }
     // 읽은 항목 Gist에서 초기화
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -1187,6 +1194,7 @@ function renderPending() {
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:16px;font-weight:700;color:var(--text1)">${t.symbol}</span>
           <span class="badge ${t.type==='매수'?'badge-buy':'badge-sell'}">${t.type}</span>
+          ${t.source==='meritz'?'<span class="badge badge-wait" style="font-size:10px">자동감지</span>':''}
         </div>
         <span style="font-size:12px;color:var(--text3)">${t.date}</span>
       </div>
