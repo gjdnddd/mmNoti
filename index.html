@@ -708,6 +708,7 @@ let endingId = null;
 let editingTradePortId = null;
 let editingTradeIdx = null;
 let parsedTrade = null;
+let pendingConfirmId = null;
 let histFilter = 'all';
 let cycleFilter = 'all';
 let segs = { ver:'4.0', sym:'SOXL', d:'40', seed:'기존 시드', manualType:'매수', editType:'매수' };
@@ -785,7 +786,7 @@ async function saveToGist() {
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
     saveLocal();
-  } catch(e) {}
+  } catch(e) { setSyncStatus('err'); showToast('Gist 저장 실패 — 설정 확인'); }
 }
 
 async function manualSave() {
@@ -1118,6 +1119,10 @@ async function confirmInput() {
   document.getElementById('confirm-section').style.display = 'none';
   document.getElementById('success-box').style.display = 'block';
   document.getElementById('success-msg').textContent = `${p.name} ${t.type} ${t.qty}주 @ $${t.price.toFixed(2)}` + (t.type==='매수'?` · T=${p.t_value}`:'');
+  if (pendingConfirmId) {
+    state.pending = state.pending.filter(x => x.id !== pendingConfirmId);
+    pendingConfirmId = null;
+  }
   parsedTrade = null;
   renderAll();
   await saveToGist();
@@ -1128,6 +1133,7 @@ function ignoreInput() {
   document.getElementById('parse-result').style.display = 'none';
   document.getElementById('confirm-section').style.display = 'none';
   parsedTrade = null;
+  pendingConfirmId = null;
 }
 
 function openManualInput(type) {
@@ -1223,6 +1229,7 @@ async function resolvePending(id, confirm) {
 function resolvePendingInput(id) {
   const t = state.pending.find(x => x.id === id);
   if (!t) return;
+  pendingConfirmId = id;
   parsedTrade = t;
   document.getElementById('p-symbol').textContent = t.symbol;
   document.getElementById('p-type').textContent = t.type;
@@ -1236,8 +1243,6 @@ function resolvePendingInput(id) {
   if (!matched.length) { showToast(`운영 중인 ${t.symbol} 포트폴리오가 없어요`, 3000); return; }
   document.getElementById('target-port').innerHTML = matched.map(p=>`<option value="${p.id}">${p.name} (${p.symbol})</option>`).join('');
   document.getElementById('confirm-section').style.display = 'block';
-  state.pending = state.pending.filter(x => x.id !== id);
-  renderPending();
 }
 
 // ══════════════════════════════════════════════
@@ -1375,7 +1380,10 @@ function daysDiff(a, b) {
 // ══════════════════════════════════════════════
 function renderSettings() {
   const el = document.getElementById('settings-list');
-  el.innerHTML = state.portfolios.filter(p => !p.ended).map(p => {
+  const gistWarn = !state.gistToken
+    ? `<div style="background:rgba(239,68,68,0.1);border:0.5px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#f87171">⚠️ Gist 미설정 — 데이터가 이 기기에만 저장됩니다</div>`
+    : '';
+  el.innerHTML = gistWarn + state.portfolios.filter(p => !p.ended).map(p => {
     const iconClass = p.symbol === 'SOXL' ? 'icon-soxl' : p.symbol === 'TQQQ' ? 'icon-tqqq' : 'icon-other';
     return `<div class="port-list-item">
       <div class="pli-icon ${iconClass}">${p.symbol.substring(0,4)}</div>
