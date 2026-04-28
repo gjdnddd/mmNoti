@@ -297,7 +297,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div class="summary-inner">
         <div class="summary-row3">
           <div><div class="s-label">전체 시드</div><div class="s-val" id="s-seed">-</div></div>
-          <div><div class="s-label">매입 금액</div><div class="s-val" id="s-invested">-</div></div>
+          <div><div class="s-label">배정 시드</div><div class="s-val" id="s-invested">-</div></div>
           <div><div class="s-label">포트폴리오</div><div class="s-val" id="s-count">-</div></div>
         </div>
         <div class="prog-row">
@@ -306,6 +306,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         </div>
       </div>
       <div class="summary-profit">누적 수익: <span id="s-profit">$0</span> &nbsp;|&nbsp; 수익률: <span id="s-yield">0.0%</span></div>
+      <div id="s-remain-row" style="margin-top:6px;font-size:13px;color:rgba(255,255,255,0.7)">잔여: <span id="s-remain">-</span></div>
     </div>
     <div id="main-cards"></div>
     <div style="height:20px"></div>
@@ -500,6 +501,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div style="font-size:12px;color:var(--text4);padding:4px 16px 8px">운영 중인 무매</div>
       <div id="settings-list"></div>
       <button class="add-port-btn" onclick="openAddSheet()">＋ 새 무매 추가</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="font-size:12px;color:var(--text4);padding:4px 0 8px">총 시드 관리</div>
+      <label class="form-label">총 운영 시드 (USD)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="total-seed-input" type="number" placeholder="예: 20000" style="flex:1" />
+        <button class="icon-btn" onclick="saveTotalSeed()">저장</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px" id="total-seed-info"></div>
     </div>
     <div class="gist-section">
       <div class="gist-title">Gist 연동</div>
@@ -700,7 +710,8 @@ let state = {
   trades: [],
   gistToken: '',
   gistId: '',
-  lastSync: null
+  lastSync: null,
+  totalSeed: 0
 };
 let editingId = null;
 let deletingId = null;
@@ -733,6 +744,7 @@ function loadLocal() {
   }
   if (state.gistToken) document.getElementById('token-input').value = state.gistToken;
   if (state.gistId) document.getElementById('gist-id-input').value = state.gistId;
+  if (state.totalSeed) document.getElementById('total-seed-input').value = state.totalSeed;
 }
 
 function saveLocal() {
@@ -758,10 +770,13 @@ async function syncGist() {
       if (parsed.portfolios?.length > 0) state.portfolios = parsed.portfolios;
       if (parsed.pending?.length > 0)    state.pending    = parsed.pending;
       if (parsed.trades?.length > 0)     state.trades     = parsed.trades;
+      if (parsed.totalSeed > 0)          state.totalSeed  = parsed.totalSeed;
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
     showToast('✓ 불러오기 완료');
+    const tsel = document.getElementById('total-seed-input');
+    if (tsel && state.totalSeed) tsel.value = state.totalSeed;
     renderAll();
     saveLocal();
   } catch(e) {
@@ -776,7 +791,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed }, null, 2) } }
     });
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -854,6 +869,17 @@ function saveGistConfig() {
   showToast('설정 저장 완료');
 }
 
+function saveTotalSeed() {
+  const val = parseFloat(document.getElementById('total-seed-input').value) || 0;
+  state.totalSeed = val;
+  saveLocal();
+  renderSummary();
+  const allocated = state.portfolios.filter(p => !p.ended).reduce((s,p) => s + p.seed, 0);
+  const info = document.getElementById('total-seed-info');
+  if (info) info.textContent = val > 0 ? `배정: $${allocated.toLocaleString()} / 잔여: $${(val - allocated).toLocaleString()}` : '';
+  showToast('✓ 총 시드 저장 완료');
+}
+
 function setSyncStatus(s) {
   const el = document.getElementById('sync-info');
   if (s === 'ok') el.innerHTML = `<span class="sync-dot dot-ok"></span>연동됨 · ${state.lastSync||''}`;
@@ -910,18 +936,33 @@ function renderAll() {
 // ══════════════════════════════════════════════
 function renderSummary() {
   const ps = state.portfolios.filter(p => !p.ended);
-  const totalSeed = ps.reduce((s,p) => s + p.seed, 0);
-  const totalInvested = ps.reduce((s,p) => s + p.avg_price * p.hold_qty, 0);
+  const totalSeed = state.totalSeed || 0;
+  const allocatedSeed = ps.reduce((s,p) => s + p.seed, 0);
+  const remaining = totalSeed - allocatedSeed;
   const totalProfit = state.portfolios.reduce((s,p) => s + p.acc_profit, 0);
   const avgProg = ps.length ? ps.reduce((s,p) => s + calcProg(p), 0) / ps.length : 0;
   const yPct = totalSeed > 0 ? (totalProfit / totalSeed * 100) : 0;
-  document.getElementById('s-seed').textContent = '$' + totalSeed.toLocaleString();
-  document.getElementById('s-invested').textContent = '$' + totalInvested.toFixed(0);
+  document.getElementById('s-seed').textContent = totalSeed > 0 ? '$' + totalSeed.toLocaleString() : '-';
+  document.getElementById('s-invested').textContent = '$' + allocatedSeed.toLocaleString();
   document.getElementById('s-count').textContent = ps.length + '개';
   document.getElementById('s-prog').style.width = avgProg.toFixed(1) + '%';
   document.getElementById('s-pct').textContent = avgProg.toFixed(1) + '%';
   document.getElementById('s-profit').textContent = '$' + totalProfit.toLocaleString();
   document.getElementById('s-yield').textContent = yPct.toFixed(2) + '%';
+  const remainEl = document.getElementById('s-remain');
+  const remainRow = document.getElementById('s-remain-row');
+  if (totalSeed > 0) {
+    remainRow.style.display = 'block';
+    if (remaining < 0) {
+      remainEl.textContent = '-$' + Math.abs(remaining).toLocaleString() + ' ⚠️ 초과';
+      remainEl.style.color = '#f87171';
+    } else {
+      remainEl.textContent = '$' + remaining.toLocaleString();
+      remainEl.style.color = '#4ade80';
+    }
+  } else {
+    remainRow.style.display = 'none';
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1173,6 +1214,11 @@ async function endCycle() {
   if (!p.cycles) p.cycles = [];
   p.cycles.push({ no: p.cycles.length+1, start: p.start_date, end: today, seed: p.seed, profit, trades_count:(p.trades||[]).length, trades:[...(p.trades||[])] });
   p.acc_profit += profit;
+  if (profit > 0 && state.totalSeed > 0) {
+    state.totalSeed = parseFloat((state.totalSeed + profit).toFixed(2));
+    const tsel = document.getElementById('total-seed-input');
+    if (tsel) tsel.value = state.totalSeed;
+  }
   if (endOnly) {
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true;
   } else {
@@ -1447,6 +1493,14 @@ async function savePortfolio() {
     acc_profit: parseFloat(document.getElementById('f-profit').value) || 0,
     start_date: document.getElementById('f-date').value
   };
+  if (state.totalSeed > 0) {
+    const currentAllocated = state.portfolios
+      .filter(p => !p.ended && p.id !== editingId)
+      .reduce((s,p) => s + p.seed, 0);
+    if (currentAllocated + data.seed > state.totalSeed) {
+      showToast(`⚠️ 총 시드 초과! 배정 $${(currentAllocated + data.seed).toLocaleString()} / 총 $${state.totalSeed.toLocaleString()}`, 3500);
+    }
+  }
   if (editingId) {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
     state.portfolios[idx] = { ...state.portfolios[idx], ...data };
