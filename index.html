@@ -602,7 +602,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 <div class="overlay" id="end-overlay" style="align-items:center">
   <div class="confirm-box">
     <div class="confirm-title">사이클 종료</div>
-    <div class="confirm-sub" id="end-sub">종료 후 다음 사이클의 시드를 선택해주세요</div>
+    <div class="confirm-sub" id="end-sub">수익의 50%가 다음 사이클 시드에 자동 추가됩니다</div>
     <div style="margin-bottom:14px">
       <label class="form-label">실현 수익 (USD)</label>
       <input class="form-input" id="end-profit" type="number" placeholder="0.00" step="0.01" />
@@ -610,8 +610,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div style="margin-bottom:16px">
       <label class="form-label">종료 방식</label>
       <div class="seg-ctrl" id="seg-seed">
-        <div class="seg-btn active" onclick="setSeg(this,'seed');showSeedLabel(true)">기존 시드</div>
-        <div class="seg-btn" onclick="setSeg(this,'seed');showSeedLabel(true)">수익 포함</div>
+        <div class="seg-btn active" onclick="setSeg(this,'seed');showSeedLabel(true)">다음 사이클</div>
         <div class="seg-btn" onclick="setSeg(this,'seed');showSeedLabel(false)">종료만</div>
       </div>
     </div>
@@ -890,31 +889,43 @@ function setSyncStatus(s) {
 // ══════════════════════════════════════════════
 //  CALC
 // ══════════════════════════════════════════════
-function calcM(p) { return (p.seed / p.D) + (p.acc_profit / (2 * p.D)); }
+function calcM(p) {
+  const invested = p.avg_price * p.hold_qty;
+  const rem = p.D - p.t_value;
+  return rem > 0 ? (p.seed - invested) / rem : p.seed / p.D;
+}
 function calcStarRate(p) { return p.R - (2 * p.R / p.D) * p.t_value; }
 function calcStarP(p) { return p.avg_price > 0 ? p.avg_price * (1 + calcStarRate(p) / 100) : 0; }
 function calcBuyP(p) { const sp = calcStarP(p); return sp > 0 ? parseFloat((sp - 0.01).toFixed(2)) : 0; }
 function calcSellP(p) { return p.avg_price > 0 ? parseFloat((p.avg_price * (1 + p.R / 100)).toFixed(2)) : 0; }
 function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
-function avgQty(p) { return p.avg_price > 0 ? Math.floor(halfM(p) / p.avg_price) : 0; }
-function starQty(p) { const bp = calcBuyP(p); return bp > 0 ? Math.floor(halfM(p) / bp) : 0; }
-function sell25qty(p) { return p.hold_qty - Math.floor(p.hold_qty * 0.75); }
-function sell75qty(p) { return Math.floor(p.hold_qty * 0.75); }
+function calcBuyQtys(p) {
+  const M = calcM(p);
+  const starP = calcBuyP(p);
+  const avgP = p.avg_price;
+  if (!starP || !avgP || M <= 0) return { xQty: 0, yQty: 0 };
+  const maxAtAvg  = Math.floor(M / avgP);
+  const maxAtStar = Math.floor(M / starP);
+  const Y = Math.floor(maxAtStar / 2);
+  const X = Math.max(0, maxAtAvg - Y);
+  return { xQty: X, yQty: Y };
+}
+function avgQty(p)  { return calcBuyQtys(p).xQty; }
+function starQty(p) { return calcBuyQtys(p).yQty; }
+function sell25qty(p) { return p.hold_qty - Math.round(p.hold_qty * 0.75); }
+function sell75qty(p) { return Math.round(p.hold_qty * 0.75); }
 function ladderPrices(p) {
-  const hm = halfM(p), aq = avgQty(p), sq = starQty(p);
-  if (!aq || !sq) return [];
-  const priceMap = new Map();
+  const M = calcM(p);
+  const { xQty, yQty } = calcBuyQtys(p);
+  const N = xQty + yQty;
+  if (!N || M <= 0) return [];
+  const result = [];
   for (let i = 1; i <= 6; i++) {
-    for (const qty of [sq, aq]) {
-      const lp = parseFloat((hm / (qty + i)).toFixed(2));
-      priceMap.set(lp, (priceMap.get(lp) || 0) + 1);
-    }
+    const price = parseFloat((M / (N + i)).toFixed(2));
+    if (price > 0) result.push({ price, qty: 1 });
   }
-  return [...priceMap.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .slice(0, 6)
-    .map(([price, qty]) => ({ price, qty }));
+  return result;
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
@@ -1149,7 +1160,7 @@ async function confirmInput() {
     const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
     p.hold_qty += t.qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
+    p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
     if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - t.qty);
@@ -1209,7 +1220,6 @@ async function endCycle() {
   if (!p) return;
   const profit = parseFloat(document.getElementById('end-profit').value) || 0;
   const endOnly = segs.seed === '종료만';
-  const useProfitSeed = segs.seed === '수익 포함';
   const today = new Date().toISOString().split('T')[0];
   if (!p.cycles) p.cycles = [];
   p.cycles.push({ no: p.cycles.length+1, start: p.start_date, end: today, seed: p.seed, profit, trades_count:(p.trades||[]).length, trades:[...(p.trades||[])] });
@@ -1222,8 +1232,7 @@ async function endCycle() {
   if (endOnly) {
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true;
   } else {
-    const newSeed = useProfitSeed ? p.seed + profit : p.seed;
-    p.seed = newSeed;
+    p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = [];
   }
   closeEndOverlay();
@@ -1603,7 +1612,7 @@ async function confirmManualInput() {
     const totalCost = p.avg_price * p.hold_qty + price * qty;
     p.hold_qty += qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
+    p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - qty);
     if (p.hold_qty === 0) { closeManualOverlay(); checkCycleEnd(pid); return; }
@@ -1714,7 +1723,7 @@ function recalcPortfolio(p) {
       const totalCost = avgPrice * qty + t.price * t.qty;
       qty += t.qty;
       avgPrice = qty > 0 ? totalCost / qty : 0;
-      tVal = Math.round((tVal + 0.5) * 10) / 10;
+      tVal = tVal === 0 ? 1 : Math.round((tVal + 0.5) * 10) / 10;
     } else {
       qty = Math.max(0, qty - t.qty);
       if (qty === 0) avgPrice = 0;
@@ -1731,7 +1740,7 @@ function recalcPortfolio(p) {
 function showSeedLabel(restart) {
   const el = document.getElementById('end-sub');
   if (el) el.textContent = restart
-    ? '종료 후 다음 사이클의 시드를 선택해주세요'
+    ? '수익의 50%가 다음 사이클 시드에 자동 추가됩니다'
     : '사이클을 종료하고 포트폴리오를 보관 상태로 전환합니다';
 }
 
@@ -1762,24 +1771,51 @@ function clearVerify() {
 function runVerify() {
   const text = document.getElementById('verify-text').value.trim();
   if (!text) { showToast('내용을 붙여넣어 주세요'); return; }
-  const lines = text.split('\n').filter(l => l.trim());
-  const orders = [];
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+  const orderRows = [], ladderRows = [];
+  let mode = null;
   for (const line of lines) {
     const cols = line.split('\t');
-    if (cols.length < 9) continue;
-    if (cols[4] === '종목코드' || cols[6] === '매매구분') continue;
-    const symbol = (cols[4]||'').trim().toUpperCase();
-    const type = (cols[6]||'').trim();
-    const qty = parseInt((cols[7]||'').replace(/,/g,'')) || 0;
-    const price = parseFloat((cols[8]||'').replace(/,/g,'')) || 0;
-    if (!symbol || !type || !qty || !price) continue;
-    orders.push({ symbol, type, qty, price });
+    if (cols.some(c => c.trim() === '주문#'))   { mode = 'order';  continue; }
+    if (cols.some(c => c.trim() === '예약번호')) { mode = 'ladder'; continue; }
+    if (!mode || cols.length < 8) continue;
+    if (mode === 'order') {
+      // col4:주문유형 col5:매매구분 col6:종목코드 col8:주문가 col9:주문량
+      const type   = (cols[5]||'').trim();
+      const symbol = (cols[6]||'').trim().toUpperCase();
+      const price  = parseFloat((cols[8]||'').replace(/,/g,'')) || 0;
+      const qty    = parseInt((cols[9]||'').replace(/,/g,''))   || 0;
+      if (!symbol || !type || !price || !qty) continue;
+      orderRows.push({ symbol, type, price, qty });
+    } else {
+      // col5:종목코드 col7:매매구분 col8:예약수량 col9:예약가격
+      const symbol = (cols[5]||'').trim().toUpperCase();
+      const type   = (cols[7]||'').trim();
+      const qty    = parseInt((cols[8]||'').replace(/,/g,''))   || 0;
+      const price  = parseFloat((cols[9]||'').replace(/,/g,'')) || 0;
+      if (!symbol || !type || !price || !qty) continue;
+      ladderRows.push({ symbol, type, price, qty });
+    }
   }
-  if (!orders.length) { showToast('파싱된 주문이 없어요. 형식을 확인해주세요'); return; }
-  const results = orders.map(o => verifyOrder(o, verifyPortId));
-  const okCount = results.filter(r => r.status === 'ok').length;
-  const summary = `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border);margin-bottom:12px"><span style="font-size:13px;color:var(--text3)">총 ${results.length}건</span><span><span style="color:#4ade80;font-weight:700">${okCount}건 정상</span> <span style="color:var(--text4);margin:0 4px">|</span> <span style="color:#f87171;font-weight:700">${results.length-okCount}건 불일치</span></span></div>`;
-  document.getElementById('verify-results').innerHTML = summary + results.map(r => renderVerifyResult(r)).join('');
+  if (!orderRows.length && !ladderRows.length) { showToast('파싱된 주문이 없어요. 형식을 확인해주세요'); return; }
+  let html = '';
+  function sectionSummary(results) {
+    const ok = results.filter(r => r.status === 'ok').length;
+    return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);margin-bottom:10px">
+      <span style="font-size:12px;color:var(--text3)">총 ${results.length}건</span>
+      <span><span style="color:#4ade80;font-weight:700">${ok}건 정상</span><span style="color:var(--text4);margin:0 4px">|</span><span style="color:#f87171;font-weight:700">${results.length-ok}건 불일치</span></span></div>`;
+  }
+  if (orderRows.length) {
+    const results = orderRows.map(o => verifyOrder(o, verifyPortId));
+    html += `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">📋 매수/매도 주문</div>`;
+    html += sectionSummary(results) + results.map(r => renderVerifyResult(r)).join('');
+  }
+  if (ladderRows.length) {
+    const results = ladderRows.map(o => verifyLadder(o, verifyPortId));
+    html += `<div style="font-size:13px;font-weight:700;color:var(--text1);margin:${orderRows.length?'16px':0} 0 8px">🪜 사다리 주문</div>`;
+    html += sectionSummary(results) + results.map(r => renderVerifyResult(r)).join('');
+  }
+  document.getElementById('verify-results').innerHTML = html;
 }
 
 function verifyOrder(order, portId) {
@@ -1800,6 +1836,23 @@ function verifyOrder(order, portId) {
   let closest = candidates[0], minDiff = Infinity;
   for (const cand of candidates) { const d = Math.abs(order.price - cand.price); if (d < minDiff) { minDiff = d; closest = cand; } }
   return { ...order, portName:p.name, status:'err', matched:closest.label, calcPrice:closest.price, calcQty:closest.qty, priceDiff:minDiff.toFixed(2) };
+}
+
+function verifyLadder(order, portId) {
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return { ...order, status:'no_port', detail:'포트폴리오 없음' };
+  if (p.symbol !== order.symbol) return { ...order, portName:p.name, status:'no_port', detail:`종목 불일치 (${p.symbol} 포트)` };
+  const PRICE_TOL = 0.05;
+  const ladder = ladderPrices(p);
+  for (let i = 0; i < ladder.length; i++) {
+    const l = ladder[i];
+    const pOk = Math.abs(order.price - l.price) <= PRICE_TOL;
+    const qOk = order.qty === l.qty;
+    if (pOk && qOk) return { ...order, portName:p.name, status:'ok',       matched:`사다리 ${i+1}단`, calcPrice:l.price, calcQty:l.qty };
+    if (pOk && !qOk) return { ...order, portName:p.name, status:'qty_warn', matched:`사다리 ${i+1}단`, calcPrice:l.price, calcQty:l.qty };
+  }
+  const closest = ladder.reduce((best, l) => Math.abs(order.price - l.price) < Math.abs(order.price - best.price) ? l : best, ladder[0] || { price:0, qty:1 });
+  return { ...order, portName:p.name, status:'err', matched:'사다리 불일치', calcPrice:closest.price, calcQty:closest.qty, priceDiff: Math.abs(order.price - closest.price).toFixed(2) };
 }
 
 function renderVerifyResult(r) {
