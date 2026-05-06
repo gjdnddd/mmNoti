@@ -489,6 +489,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       </div>
     </div>
     <div id="ongoing-list"></div>
+    <div id="seed-history-list"></div>
     <div id="cycle-list"></div>
   </div>
 
@@ -510,7 +511,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <input class="form-input" id="total-seed-input" type="number" placeholder="예: 20000" style="flex:1" />
         <button class="icon-btn" onclick="saveTotalSeed()">저장</button>
       </div>
-      <div style="font-size:12px;color:var(--text3);margin-top:8px" id="total-seed-info"></div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px" id="total-seed-info"></div>
+      <label class="form-label" style="margin-top:14px">최초 시드 (USD)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="initial-seed-input" type="number" placeholder="기준 시드 입력" style="flex:1" />
+        <button class="icon-btn" onclick="saveInitialTotalSeed()">저장</button>
+      </div>
+      <div style="font-size:12px;color:var(--text4);margin-top:6px" id="initial-seed-display"></div>
+      <button class="btn-secondary" style="width:100%;margin-top:10px;font-size:13px" onclick="resetSeedPeriod()">수익률 기준 리셋 (입출금·리밸런싱 시)</button>
     </div>
     <div style="padding:0 16px 16px;border-top:0.5px solid var(--border)">
       <div style="font-size:12px;color:var(--text4);padding:12px 0 8px">시세 연동 (Finnhub)</div>
@@ -578,6 +586,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">시드 (USD)</label><input class="form-input" id="f-seed" type="number" placeholder="5000" /></div>
       <div><label class="form-label">별% (R값)</label><input class="form-input" id="f-r" type="number" placeholder="20" /></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="form-label">최초 시드 (USD)</label>
+      <input class="form-input" id="f-initial-seed" type="number" placeholder="비우면 시드값으로 자동 설정" />
     </div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">현재 T값</label><input class="form-input" id="f-t" type="number" placeholder="0" step="0.5" /></div>
@@ -725,6 +737,7 @@ let state = {
   lastSync: null,
   totalSeed: 0,
   initial_totalSeed: 0,
+  seed_history: [],
   finnhubKey: '',
   prices: {}
 };
@@ -767,6 +780,7 @@ function loadLocal() {
 
 function migrateSeedFields() {
   if (!state.initial_totalSeed) state.initial_totalSeed = state.totalSeed || 0;
+  if (!state.seed_history) state.seed_history = [];
   state.portfolios.forEach(p => {
     if (p.initial_seed === undefined) p.initial_seed = p.seed;
   });
@@ -797,6 +811,7 @@ async function syncGist() {
       if (parsed.trades?.length > 0)       state.trades            = parsed.trades;
       if (parsed.totalSeed > 0)            state.totalSeed         = parsed.totalSeed;
       if (parsed.initial_totalSeed > 0)    state.initial_totalSeed = parsed.initial_totalSeed;
+      if (parsed.seed_history?.length > 0) state.seed_history      = parsed.seed_history;
       migrateSeedFields();
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
@@ -818,7 +833,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed, seed_history: state.seed_history }, null, 2) } }
     });
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -956,13 +971,40 @@ function renderManualPrices() {
 function saveTotalSeed() {
   const val = parseFloat(document.getElementById('total-seed-input').value) || 0;
   state.totalSeed = val;
-  state.initial_totalSeed = val;
   saveLocal();
   renderSummary();
   const allocated = state.portfolios.filter(p => !p.ended).reduce((s,p) => s + p.seed, 0);
   const info = document.getElementById('total-seed-info');
   if (info) info.textContent = val > 0 ? `배정: $${allocated.toLocaleString()} / 잔여: $${(val - allocated).toLocaleString()}` : '';
   showToast('✓ 총 시드 저장 완료');
+}
+
+function saveInitialTotalSeed() {
+  const val = parseFloat(document.getElementById('initial-seed-input').value) || 0;
+  if (!val) { showToast('최초 시드를 입력해주세요'); return; }
+  state.initial_totalSeed = val;
+  saveLocal();
+  renderSummary();
+  renderSettings();
+  showToast('✓ 최초 시드 저장 완료');
+}
+
+function resetSeedPeriod() {
+  const init = state.initial_totalSeed || 0;
+  const cur  = state.totalSeed || 0;
+  if (!init) { showToast('최초 시드를 먼저 입력해주세요'); return; }
+  const profit = parseFloat((cur - init).toFixed(2));
+  const yPct   = parseFloat((profit / init * 100).toFixed(2));
+  const date   = new Date().toISOString().split('T')[0];
+  if (!state.seed_history) state.seed_history = [];
+  state.seed_history.unshift({ date, initial_seed: init, final_seed: cur, profit, yield_pct: yPct });
+  state.initial_totalSeed = cur;
+  document.getElementById('initial-seed-input').value = cur;
+  saveLocal();
+  renderSummary();
+  renderCycle();
+  renderSettings();
+  showToast(`✓ 리셋 완료 — 기간 수익 $${profit} (${yPct}%) 기록됨`);
 }
 
 function setSyncStatus(s) {
@@ -1038,8 +1080,8 @@ function renderSummary() {
   const remaining = totalSeed - allocatedSeed;
   const totalProfit = state.portfolios.reduce((s,p) => s + p.acc_profit, 0);
   const avgProg = ps.length ? ps.reduce((s,p) => s + calcProg(p), 0) / ps.length : 0;
-  const yPct = totalSeed > 0 ? (totalProfit / totalSeed * 100) : 0;
   const initTotal = state.initial_totalSeed || 0;
+  const yPct = initTotal > 0 ? ((totalSeed - initTotal) / initTotal * 100) : 0;
   const seedDiff = initTotal > 0 && totalSeed !== initTotal;
   document.getElementById('s-seed').innerHTML = totalSeed > 0
     ? `$${totalSeed.toLocaleString()}${seedDiff ? `<br><span style="font-size:11px;color:var(--text4);font-weight:400">최초 $${initTotal.toLocaleString()}</span>` : ''}`
@@ -1090,6 +1132,12 @@ function renderMainCards() {
       : '';
     const evalAmt = curP ? `$${(curP * p.hold_qty).toFixed(0)}` : '-';
     const invested = p.avg_price * p.hold_qty;
+    const initSeedP = p.initial_seed || p.seed;
+    const portYield = initSeedP > 0 ? (p.acc_profit / initSeedP * 100) : 0;
+    const portYieldTag = p.acc_profit !== 0
+      ? `<div style="font-size:11px;color:${portYield>=0?'#4ade80':'#f87171'};margin-top:2px;font-weight:600">${portYield>=0?'▲':'▼'}${Math.abs(portYield).toFixed(2)}% ($${p.acc_profit.toFixed(0)})</div>`
+      : '<div style="font-size:11px;color:var(--text4);margin-top:2px">수익 0</div>';
+    const initialSeedTag = `<div style="font-size:11px;color:var(--text4);margin-top:1px">최초 $${initSeedP.toLocaleString()}</div>`;
     return `
     <div class="port-card">
       <div class="pc-head">
@@ -1101,6 +1149,8 @@ function renderMainCards() {
           <div>
             <div class="pc-symbol">${p.symbol}</div>
             <div class="pc-sub">${p.name} · D=${p.D}</div>
+            ${portYieldTag}
+            ${initialSeedTag}
           </div>
           <div class="pc-info-box">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 8px">
@@ -1510,6 +1560,24 @@ function renderCycle() {
       </div>
     </div>`;
   }).join('');
+  const sh = state.seed_history || [];
+  const shEl = document.getElementById('seed-history-list');
+  if (shEl) {
+    shEl.innerHTML = sh.length ? sh.map(h => `
+      <div class="cycle-card" style="border-left:3px solid #60a5fa">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:2px">${h.date} 기준 리셋</div>
+            <div style="font-size:13px;color:var(--text1)">최초 $${(h.initial_seed||0).toLocaleString()} → $${(h.final_seed||0).toLocaleString()}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:15px;font-weight:700;color:${h.profit>=0?'#4ade80':'#f87171'}">${h.profit>=0?'+':''}$${h.profit}</div>
+            <div style="font-size:12px;color:var(--text3)">${h.profit>=0?'+':''}${h.yield_pct}%</div>
+          </div>
+        </div>
+      </div>`).join('')
+    : '';
+  }
   document.getElementById('cycle-list').innerHTML = filtered.length
     ? filtered.map((c,i) => {
         const yp = (c.profit/c.seed*100).toFixed(2);
@@ -1572,6 +1640,21 @@ function renderSettings() {
   if (!state.finnhubKey) renderManualPrices();
   const tsi = document.getElementById('total-seed-input');
   if (tsi) tsi.value = state.totalSeed || '';
+  const isi = document.getElementById('initial-seed-input');
+  if (isi) isi.value = state.initial_totalSeed || '';
+  const isd = document.getElementById('initial-seed-display');
+  if (isd) {
+    const init = state.initial_totalSeed || 0;
+    const cur  = state.totalSeed || 0;
+    if (init > 0) {
+      const diff = parseFloat((cur - init).toFixed(2));
+      const pct  = (diff / init * 100).toFixed(2);
+      const color = diff >= 0 ? '#4ade80' : '#f87171';
+      isd.innerHTML = `현재 수익률: <span style="color:${color};font-weight:600">${diff >= 0 ? '+' : ''}${pct}%</span> (${diff >= 0 ? '+' : ''}$${diff.toLocaleString()})`;
+    } else {
+      isd.textContent = '';
+    }
+  }
   const fki = document.getElementById('finnhub-key-input');
   if (fki && state.finnhubKey) fki.value = state.finnhubKey;
 }
@@ -1583,7 +1666,7 @@ function openAddSheet() {
   editingId = null;
   document.getElementById('add-sheet-title').textContent = '새 무매 추가';
   document.getElementById('del-btn').style.display = 'none';
-  ['f-name','f-seed','f-r','f-t','f-avg','f-qty','f-profit'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-seed','f-initial-seed','f-r','f-t','f-avg','f-qty','f-profit'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
   resetSegs();
   document.getElementById('add-overlay').classList.add('open');
@@ -1597,6 +1680,7 @@ function openEditSheet(id) {
   document.getElementById('del-btn').style.display = 'block';
   document.getElementById('f-name').value = p.name;
   document.getElementById('f-seed').value = p.seed;
+  document.getElementById('f-initial-seed').value = p.initial_seed || p.seed;
   document.getElementById('f-r').value = p.R;
   document.getElementById('f-t').value = p.t_value;
   document.getElementById('f-avg').value = p.avg_price;
@@ -1614,10 +1698,12 @@ function closeAddSheet() { document.getElementById('add-overlay').classList.remo
 async function savePortfolio() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('이름을 입력해주세요'); return; }
+  const seedVal = parseFloat(document.getElementById('f-seed').value) || 5000;
+  const initialSeedVal = parseFloat(document.getElementById('f-initial-seed').value) || seedVal;
   const data = {
     name, version: segs.ver, symbol: segs.sym, D: parseInt(segs.d),
     R: parseFloat(document.getElementById('f-r').value) || (segs.sym==='SOXL'?20:15),
-    seed: parseFloat(document.getElementById('f-seed').value) || 5000,
+    seed: seedVal,
     t_value: parseFloat(document.getElementById('f-t').value) || 0,
     avg_price: parseFloat(document.getElementById('f-avg').value) || 0,
     hold_qty: parseInt(document.getElementById('f-qty').value) || 0,
@@ -1634,9 +1720,9 @@ async function savePortfolio() {
   }
   if (editingId) {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
-    state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: data.seed };
+    state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: initialSeedVal };
   } else {
-    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: data.seed, ...data });
+    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, ...data });
   }
   closeAddSheet();
   renderAll();
