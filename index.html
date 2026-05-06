@@ -724,6 +724,7 @@ let state = {
   gistId: '',
   lastSync: null,
   totalSeed: 0,
+  initial_totalSeed: 0,
   finnhubKey: '',
   prices: {}
 };
@@ -757,10 +758,18 @@ function loadLocal() {
   if (saved) {
     try { Object.assign(state, JSON.parse(saved)); } catch(e) {}
   }
+  migrateSeedFields();
   if (state.gistToken) document.getElementById('token-input').value = state.gistToken;
   if (state.gistId) document.getElementById('gist-id-input').value = state.gistId;
   if (state.totalSeed)   document.getElementById('total-seed-input').value = state.totalSeed;
   if (state.finnhubKey) document.getElementById('finnhub-key-input').value = state.finnhubKey;
+}
+
+function migrateSeedFields() {
+  if (!state.initial_totalSeed) state.initial_totalSeed = state.totalSeed || 0;
+  state.portfolios.forEach(p => {
+    if (p.initial_seed === undefined) p.initial_seed = p.seed;
+  });
 }
 
 function saveLocal() {
@@ -783,10 +792,12 @@ async function syncGist() {
     const content = data.files['mumae_data.json']?.content;
     if (content) {
       const parsed = JSON.parse(content);
-      if (parsed.portfolios?.length > 0) state.portfolios = parsed.portfolios;
-      if (parsed.pending?.length > 0)    state.pending    = parsed.pending;
-      if (parsed.trades?.length > 0)     state.trades     = parsed.trades;
-      if (parsed.totalSeed > 0)          state.totalSeed  = parsed.totalSeed;
+      if (parsed.portfolios?.length > 0)   state.portfolios        = parsed.portfolios;
+      if (parsed.pending?.length > 0)      state.pending           = parsed.pending;
+      if (parsed.trades?.length > 0)       state.trades            = parsed.trades;
+      if (parsed.totalSeed > 0)            state.totalSeed         = parsed.totalSeed;
+      if (parsed.initial_totalSeed > 0)    state.initial_totalSeed = parsed.initial_totalSeed;
+      migrateSeedFields();
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
@@ -807,7 +818,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed }, null, 2) } }
     });
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -945,6 +956,7 @@ function renderManualPrices() {
 function saveTotalSeed() {
   const val = parseFloat(document.getElementById('total-seed-input').value) || 0;
   state.totalSeed = val;
+  state.initial_totalSeed = val;
   saveLocal();
   renderSummary();
   const allocated = state.portfolios.filter(p => !p.ended).reduce((s,p) => s + p.seed, 0);
@@ -1027,7 +1039,11 @@ function renderSummary() {
   const totalProfit = state.portfolios.reduce((s,p) => s + p.acc_profit, 0);
   const avgProg = ps.length ? ps.reduce((s,p) => s + calcProg(p), 0) / ps.length : 0;
   const yPct = totalSeed > 0 ? (totalProfit / totalSeed * 100) : 0;
-  document.getElementById('s-seed').textContent = totalSeed > 0 ? '$' + totalSeed.toLocaleString() : '-';
+  const initTotal = state.initial_totalSeed || 0;
+  const seedDiff = initTotal > 0 && totalSeed !== initTotal;
+  document.getElementById('s-seed').innerHTML = totalSeed > 0
+    ? `$${totalSeed.toLocaleString()}${seedDiff ? `<br><span style="font-size:11px;color:var(--text4);font-weight:400">최초 $${initTotal.toLocaleString()}</span>` : ''}`
+    : '-';
   document.getElementById('s-invested').textContent = '$' + allocatedSeed.toLocaleString();
   document.getElementById('s-count').textContent = ps.length + '개';
   document.getElementById('s-prog').style.width = avgProg.toFixed(1) + '%';
@@ -1152,7 +1168,9 @@ function openDetail(id) {
   document.getElementById('d-pct').textContent = prog.toFixed(1) + '%';
   document.getElementById('d-tsub').textContent = p.t_value + 'T / ' + p.D;
   document.getElementById('d-date').textContent = (p.start_date || '-') + ' ~';
-  document.getElementById('d-seed').textContent = '$' + p.seed.toLocaleString();
+  const initSeed = p.initial_seed || p.seed;
+  const seedChanged = initSeed !== p.seed;
+  document.getElementById('d-seed').innerHTML = `$${p.seed.toLocaleString()}${seedChanged ? `<br><span style="font-size:11px;color:var(--text4);font-weight:400">최초 $${initSeed.toLocaleString()}</span>` : ''}`;
   document.getElementById('d-used').textContent = '$' + used;
   document.getElementById('d-m').textContent = '$' + mVal.toFixed(2);
   document.getElementById('d-avg').innerHTML = '$' + p.avg_price.toFixed(2)
@@ -1291,10 +1309,25 @@ function openManualInput(type) {
 // ══════════════════════════════════════════════
 //  CYCLE END
 // ══════════════════════════════════════════════
+function calcCycleProfit(p) {
+  const trades = p.trades || [];
+  const buyTotal  = trades.filter(t => t.type === '매수').reduce((s, t) => s + (t.amount || t.price * t.qty), 0);
+  const sellTotal = trades.filter(t => t.type === '매도').reduce((s, t) => s + (t.amount || t.price * t.qty), 0);
+  return { profit: parseFloat((sellTotal - buyTotal).toFixed(2)), buyTotal, sellTotal };
+}
+
 function checkCycleEnd(id) {
   endingId = id;
   const p = state.portfolios.find(x => x.id === id);
-  document.getElementById('end-profit').value = '';
+  const { profit, buyTotal, sellTotal } = calcCycleProfit(p);
+  document.getElementById('end-profit').value = profit !== 0 ? profit : '';
+  const sub = document.getElementById('end-sub');
+  if (sub) {
+    const breakdown = buyTotal || sellTotal
+      ? `매수 $${buyTotal.toFixed(2)} / 매도 $${sellTotal.toFixed(2)} → 수익 <strong>$${profit.toFixed(2)}</strong><br>수익의 50%가 다음 사이클 시드에 자동 추가됩니다`
+      : `수익의 50%가 다음 사이클 시드에 자동 추가됩니다`;
+    sub.innerHTML = breakdown;
+  }
   setSeg(document.querySelector('#seg-seed .seg-btn'), 'seed');
   document.getElementById('end-overlay').classList.add('open');
 }
@@ -1310,15 +1343,13 @@ async function endCycle() {
   if (!p.cycles) p.cycles = [];
   p.cycles.push({ no: p.cycles.length+1, start: p.start_date, end: today, seed: p.seed, profit, trades_count:(p.trades||[]).length, trades:[...(p.trades||[])] });
   p.acc_profit += profit;
-  if (profit > 0 && state.totalSeed > 0) {
-    state.totalSeed = parseFloat((state.totalSeed + profit).toFixed(2));
-    const tsel = document.getElementById('total-seed-input');
-    if (tsel) tsel.value = state.totalSeed;
-  }
+  state.totalSeed = parseFloat((state.totalSeed + profit).toFixed(2));
+  const tsel = document.getElementById('total-seed-input');
+  if (tsel) tsel.value = state.totalSeed;
   if (endOnly) {
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true;
   } else {
-    p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
+    if (profit > 0) p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = [];
   }
   closeEndOverlay();
@@ -1603,9 +1634,9 @@ async function savePortfolio() {
   }
   if (editingId) {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
-    state.portfolios[idx] = { ...state.portfolios[idx], ...data };
+    state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: data.seed };
   } else {
-    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], ...data });
+    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: data.seed, ...data });
   }
   closeAddSheet();
   renderAll();
