@@ -53,6 +53,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .btn-primary { width: 100%; padding: 14px; background: var(--blue); border: none; border-radius: var(--radius-sm); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
 .btn-secondary { width: 100%; padding: 12px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text2); font-size: 14px; cursor: pointer; }
 .btn-danger { width: 100%; padding: 12px; background: rgba(239,68,68,0.15); border: 0.5px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); color: var(--red); font-size: 14px; cursor: pointer; }
+.btn-vr { padding: 12px 14px; background: rgba(99,102,241,0.2); border: 0.5px solid rgba(99,102,241,0.4); border-radius: var(--radius-sm); color: #a5b4fc; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .divider { height: 0.5px; background: var(--border); margin: 0 16px; }
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px; }
 .empty-icon { font-size: 40px; margin-bottom: 12px; }
@@ -557,6 +558,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <button class="btn-secondary" style="flex:1" onclick="syncGist()">지금 불러오기</button>
       </div>
     </div>
+    <div class="gist-section">
+      <div class="gist-title">VR 대시보드 연동</div>
+      <div class="gist-sub">TQQQ 체결을 VR 대시보드로 전송할 Gist ID를 입력하세요. 토큰은 위와 공유합니다.</div>
+      <div style="margin-top:10px">
+        <label class="form-label">VR 대시보드 Gist ID</label>
+        <div class="gist-row">
+          <input class="gist-input" id="vr-gist-id-input" placeholder="VR 대시보드 Gist ID" />
+          <button class="gist-btn" onclick="saveVrGistConfig()">저장</button>
+        </div>
+      </div>
+    </div>
     <div style="height:20px"></div>
   </div>
 
@@ -734,6 +746,7 @@ let state = {
   trades: [],
   gistToken: '',
   gistId: '',
+  vrGistId: '',
   lastSync: null,
   totalSeed: 0,
   initial_totalSeed: 0,
@@ -774,6 +787,7 @@ function loadLocal() {
   migrateSeedFields();
   if (state.gistToken) document.getElementById('token-input').value = state.gistToken;
   if (state.gistId) document.getElementById('gist-id-input').value = state.gistId;
+  if (state.vrGistId) document.getElementById('vr-gist-id-input').value = state.vrGistId;
   if (state.totalSeed)   document.getElementById('total-seed-input').value = state.totalSeed;
   if (state.finnhubKey) document.getElementById('finnhub-key-input').value = state.finnhubKey;
 }
@@ -909,6 +923,44 @@ function saveGistConfig() {
   state.gistId = document.getElementById('gist-id-input').value.trim();
   saveLocal();
   showToast('설정 저장 완료');
+}
+
+function saveVrGistConfig() {
+  state.vrGistId = document.getElementById('vr-gist-id-input').value.trim();
+  saveLocal();
+  showToast('VR Gist ID 저장 완료');
+}
+
+async function sendToVR(id) {
+  const t = state.pending.find(x => x.id === id);
+  if (!t) return;
+  const token = state.gistToken;
+  const vrGistId = state.vrGistId;
+  if (!token || !vrGistId) { showToast('VR Gist ID를 먼저 설정해주세요'); return; }
+  try {
+    const res = await fetch(`https://api.github.com/gists/${vrGistId}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    let existing = [];
+    const content = data.files['vr_pending.json']?.content;
+    if (content) { try { existing = JSON.parse(content); } catch(e) {} }
+    existing.push({
+      id: t.id, type: t.type,
+      price: t.price, qty: t.qty, amount: t.amount,
+      date: t.date, timestamp: Date.now()
+    });
+    await fetch(`https://api.github.com/gists/${vrGistId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'vr_pending.json': { content: JSON.stringify(existing, null, 2) } } })
+    });
+    state.pending = state.pending.filter(x => x.id !== id);
+    renderPending();
+    await saveToGist();
+    showToast('✓ VR 대시보드로 전송 완료');
+  } catch(e) { showToast('전송 실패: ' + e.message); }
 }
 
 function saveFinnhubKey() {
@@ -1433,6 +1485,7 @@ function renderPending() {
       </div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="resolvePending('${t.id}',false)">무시</button>
+        ${t.symbol === 'TQQQ' && state.vrGistId ? `<button class="btn-vr" onclick="sendToVR('${t.id}')">VR로 ↗</button>` : ''}
         <button class="btn-primary" onclick="resolvePendingInput('${t.id}')">입력하기</button>
       </div>
     </div>`).join('');
