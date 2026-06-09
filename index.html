@@ -53,6 +53,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .btn-primary { width: 100%; padding: 14px; background: var(--blue); border: none; border-radius: var(--radius-sm); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
 .btn-secondary { width: 100%; padding: 12px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text2); font-size: 14px; cursor: pointer; }
 .btn-danger { width: 100%; padding: 12px; background: rgba(239,68,68,0.15); border: 0.5px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); color: var(--red); font-size: 14px; cursor: pointer; }
+.btn-vr { padding: 12px 14px; background: rgba(99,102,241,0.2); border: 0.5px solid rgba(99,102,241,0.4); border-radius: var(--radius-sm); color: #a5b4fc; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .divider { height: 0.5px; background: var(--border); margin: 0 16px; }
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px; }
 .empty-icon { font-size: 40px; margin-bottom: 12px; }
@@ -244,11 +245,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .trade-edit-btn { color: #60a5fa; }
 .trade-del-btn2 { color: #f87171; }
 
-/* ── 예수금 계산기 ── */
-.fund-row { display: none; padding: 3px 16px 3px 42px; justify-content: space-between; align-items: center; }
-.fund-label { font-size: 11px; color: var(--text3); }
-.fund-amount { font-size: 12px; font-weight: 700; color: #4ade80; }
-.fund-toggle-btn { margin-left: auto; background: none; border: 0.5px solid rgba(34,197,94,0.35); border-radius: 4px; color: #4ade80; font-size: 11px; padding: 2px 8px; cursor: pointer; }
 
 /* ── 주문 검증 ── */
 .verify-result { margin: 0 16px 10px; background: var(--bg2); border-radius: var(--radius); padding: 14px; }
@@ -294,6 +290,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="topbar">
       <span class="topbar-title">포트폴리오</span>
       <div style="display:flex;gap:8px">
+        <button class="icon-btn" onclick="fetchPrices()">📈 시세</button>
         <button class="icon-btn" onclick="syncGist()">🔄 동기화</button>
       </div>
     </div>
@@ -302,7 +299,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div class="summary-inner">
         <div class="summary-row3">
           <div><div class="s-label">전체 시드</div><div class="s-val" id="s-seed">-</div></div>
-          <div><div class="s-label">매입 금액</div><div class="s-val" id="s-invested">-</div></div>
+          <div><div class="s-label">배정 시드</div><div class="s-val" id="s-invested">-</div></div>
           <div><div class="s-label">포트폴리오</div><div class="s-val" id="s-count">-</div></div>
         </div>
         <div class="prog-row">
@@ -311,6 +308,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         </div>
       </div>
       <div class="summary-profit">누적 수익: <span id="s-profit">$0</span> &nbsp;|&nbsp; 수익률: <span id="s-yield">0.0%</span></div>
+      <div id="s-remain-row" style="margin-top:6px;font-size:13px;color:rgba(255,255,255,0.7)">잔여: <span id="s-remain">-</span></div>
     </div>
     <div id="main-cards"></div>
     <div style="height:20px"></div>
@@ -444,6 +442,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <label class="form-label">무매 선택</label>
         <select class="select-input" id="target-port"></select>
       </div>
+      <div style="margin-bottom:12px" id="t-inc-section">
+        <label class="form-label">T값 증가</label>
+        <div class="seg-ctrl" id="seg-t-inc">
+          <div class="seg-btn" onclick="setSeg(this,'tInc')">+1</div>
+          <div class="seg-btn active" onclick="setSeg(this,'tInc')">+0.5</div>
+          <div class="seg-btn" onclick="setSeg(this,'tInc')">+0</div>
+        </div>
+      </div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="ignoreInput()">무시</button>
         <button class="btn-primary" onclick="confirmInput()">입력하기</button>
@@ -492,6 +498,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       </div>
     </div>
     <div id="ongoing-list"></div>
+    <div id="seed-history-list"></div>
     <div id="cycle-list"></div>
   </div>
 
@@ -505,6 +512,34 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div style="font-size:12px;color:var(--text4);padding:4px 16px 8px">운영 중인 무매</div>
       <div id="settings-list"></div>
       <button class="add-port-btn" onclick="openAddSheet()">＋ 새 무매 추가</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="font-size:12px;color:var(--text4);padding:4px 0 8px">총 시드 관리</div>
+      <label class="form-label">총 운영 시드 (USD)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="total-seed-input" type="number" placeholder="예: 20000" style="flex:1" />
+        <button class="icon-btn" onclick="saveTotalSeed()">저장</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px" id="total-seed-info"></div>
+      <label class="form-label" style="margin-top:14px">최초 시드 (USD)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="initial-seed-input" type="number" placeholder="기준 시드 입력" style="flex:1" />
+        <button class="icon-btn" onclick="saveInitialTotalSeed()">저장</button>
+      </div>
+      <div style="font-size:12px;color:var(--text4);margin-top:6px" id="initial-seed-display"></div>
+      <button class="btn-secondary" style="width:100%;margin-top:10px;font-size:13px" onclick="resetSeedPeriod()">수익률 기준 리셋 (입출금·리밸런싱 시)</button>
+    </div>
+    <div style="padding:0 16px 16px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;color:var(--text4);padding:12px 0 8px">시세 연동 (Finnhub)</div>
+      <label class="form-label">API Key</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input class="form-input" id="finnhub-key-input" type="password" placeholder="finnhub api key" style="flex:1" />
+        <button class="icon-btn" onclick="saveFinnhubKey()">저장</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="sync-info" style="margin:0" id="price-sync-info"><span class="sync-dot dot-wait"></span>미연동</div>
+      </div>
+      <div id="manual-prices" style="margin-top:12px"></div>
     </div>
     <div class="gist-section">
       <div class="gist-title">Gist 연동</div>
@@ -529,6 +564,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn-secondary" style="flex:1" onclick="manualSave()">지금 저장</button>
         <button class="btn-secondary" style="flex:1" onclick="syncGist()">지금 불러오기</button>
+      </div>
+    </div>
+    <div class="gist-section">
+      <div class="gist-title">VR 대시보드 연동</div>
+      <div class="gist-sub">TQQQ 체결을 VR 대시보드로 전송할 Gist ID를 입력하세요. 토큰은 위와 공유합니다.</div>
+      <div style="margin-top:10px">
+        <label class="form-label">VR 대시보드 Gist ID</label>
+        <div class="gist-row">
+          <input class="gist-input" id="vr-gist-id-input" placeholder="VR 대시보드 Gist ID" />
+          <button class="gist-btn" onclick="saveVrGistConfig()">저장</button>
+        </div>
       </div>
     </div>
     <div style="height:20px"></div>
@@ -560,6 +606,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">시드 (USD)</label><input class="form-input" id="f-seed" type="number" placeholder="5000" /></div>
       <div><label class="form-label">별% (R값)</label><input class="form-input" id="f-r" type="number" placeholder="20" /></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="form-label">최초 시드 (USD)</label>
+      <input class="form-input" id="f-initial-seed" type="number" placeholder="비우면 시드값으로 자동 설정" />
     </div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">현재 T값</label><input class="form-input" id="f-t" type="number" placeholder="0" step="0.5" /></div>
@@ -597,7 +647,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 <div class="overlay" id="end-overlay" style="align-items:center">
   <div class="confirm-box">
     <div class="confirm-title">사이클 종료</div>
-    <div class="confirm-sub" id="end-sub">종료 후 다음 사이클의 시드를 선택해주세요</div>
+    <div class="confirm-sub" id="end-sub">수익의 50%가 다음 사이클 시드에 자동 추가됩니다</div>
     <div style="margin-bottom:14px">
       <label class="form-label">실현 수익 (USD)</label>
       <input class="form-input" id="end-profit" type="number" placeholder="0.00" step="0.01" />
@@ -605,8 +655,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div style="margin-bottom:16px">
       <label class="form-label">종료 방식</label>
       <div class="seg-ctrl" id="seg-seed">
-        <div class="seg-btn active" onclick="setSeg(this,'seed');showSeedLabel(true)">기존 시드</div>
-        <div class="seg-btn" onclick="setSeg(this,'seed');showSeedLabel(true)">수익 포함</div>
+        <div class="seg-btn active" onclick="setSeg(this,'seed');showSeedLabel(true)">다음 사이클</div>
         <div class="seg-btn" onclick="setSeg(this,'seed');showSeedLabel(false)">종료만</div>
       </div>
     </div>
@@ -649,6 +698,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div class="seg-ctrl" id="seg-manual-type">
         <div class="seg-btn active" onclick="setSeg(this,'manualType')" style="color:#f87171">매수</div>
         <div class="seg-btn" onclick="setSeg(this,'manualType')" style="color:#60a5fa">매도</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="form-label">T값 증가</label>
+      <div class="seg-ctrl" id="seg-t-inc-manual">
+        <div class="seg-btn" onclick="setSeg(this,'tIncManual')">+1</div>
+        <div class="seg-btn active" onclick="setSeg(this,'tIncManual')">+0.5</div>
+        <div class="seg-btn" onclick="setSeg(this,'tIncManual')">+0</div>
       </div>
     </div>
     <div class="grid2" style="margin-bottom:14px">
@@ -705,18 +762,24 @@ let state = {
   trades: [],
   gistToken: '',
   gistId: '',
-  lastSync: null
+  vrGistId: '',
+  lastSync: null,
+  totalSeed: 0,
+  initial_totalSeed: 0,
+  seed_history: [],
+  finnhubKey: '',
+  prices: {}
 };
 let editingId = null;
 let deletingId = null;
 let endingId = null;
 let editingTradePortId = null;
 let editingTradeIdx = null;
-let fundToggles = {};
 let parsedTrade = null;
+let pendingConfirmId = null;
 let histFilter = 'all';
 let cycleFilter = 'all';
-let segs = { ver:'4.0', sym:'SOXL', d:'40', seed:'기존 시드', manualType:'매수', editType:'매수' };
+let segs = { ver:'4.0', sym:'SOXL', d:'40', seed:'기존 시드', manualType:'매수', editType:'매수', tInc:'+0.5', tIncManual:'+0.5' };
 
 // ══════════════════════════════════════════════
 //  INIT
@@ -725,8 +788,11 @@ window.addEventListener('load', async () => {
   loadLocal();
   if (state.gistToken && state.gistId) {
     await syncGist();
+    await pollMeritz();
   }
+  if (state.finnhubKey) fetchPrices();
   renderAll();
+  setInterval(pollMeritz, 60000);
 });
 
 function loadLocal() {
@@ -734,8 +800,20 @@ function loadLocal() {
   if (saved) {
     try { Object.assign(state, JSON.parse(saved)); } catch(e) {}
   }
+  migrateSeedFields();
   if (state.gistToken) document.getElementById('token-input').value = state.gistToken;
   if (state.gistId) document.getElementById('gist-id-input').value = state.gistId;
+  if (state.vrGistId) document.getElementById('vr-gist-id-input').value = state.vrGistId;
+  if (state.totalSeed)   document.getElementById('total-seed-input').value = state.totalSeed;
+  if (state.finnhubKey) document.getElementById('finnhub-key-input').value = state.finnhubKey;
+}
+
+function migrateSeedFields() {
+  if (!state.initial_totalSeed) state.initial_totalSeed = state.totalSeed || 0;
+  if (!state.seed_history) state.seed_history = [];
+  state.portfolios.forEach(p => {
+    if (p.initial_seed === undefined) p.initial_seed = p.seed;
+  });
 }
 
 function saveLocal() {
@@ -755,16 +833,22 @@ async function syncGist() {
     });
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
-    const content = data.files['memae_data.json']?.content;
+    const content = data.files['mumae_data.json']?.content;
     if (content) {
       const parsed = JSON.parse(content);
-      state.portfolios = parsed.portfolios || state.portfolios;
-      state.pending = parsed.pending || state.pending;
-      state.trades = parsed.trades || state.trades;
+      if (parsed.portfolios?.length > 0)   state.portfolios        = parsed.portfolios;
+      if (parsed.pending?.length > 0)      state.pending           = parsed.pending;
+      if (parsed.trades?.length > 0)       state.trades            = parsed.trades;
+      if (parsed.totalSeed > 0)            state.totalSeed         = parsed.totalSeed;
+      if (parsed.initial_totalSeed > 0)    state.initial_totalSeed = parsed.initial_totalSeed;
+      if (parsed.seed_history?.length > 0) state.seed_history      = parsed.seed_history;
+      migrateSeedFields();
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
     showToast('✓ 불러오기 완료');
+    const tsel = document.getElementById('total-seed-input');
+    if (tsel && state.totalSeed) tsel.value = state.totalSeed;
     renderAll();
     saveLocal();
   } catch(e) {
@@ -779,7 +863,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'memae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed, seed_history: state.seed_history }, null, 2) } }
     });
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -789,7 +873,7 @@ async function saveToGist() {
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
     saveLocal();
-  } catch(e) {}
+  } catch(e) { setSyncStatus('err'); showToast('Gist 저장 실패 — 설정 확인'); }
 }
 
 async function manualSave() {
@@ -797,11 +881,198 @@ async function manualSave() {
   showToast('✓ 저장 완료 (' + (state.lastSync||'') + ')');
 }
 
+function parseMeritzItem(item) {
+  const symbolMatch = (item['종목명'] || '').match(/\(([A-Z0-9]+)\)/);
+  const symbol = symbolMatch ? symbolMatch[1] : '';
+  const price  = parseFloat((item['체결단가']  || '0').replace(/USD\s*/i, '').replace(/,/g, ''));
+  const qty    = parseInt((item['체결수량']   || '0').replace(/[^0-9]/g, ''));
+  const amount = parseFloat((item['체결금액'] || '0').replace(/USD\s*/i, '').replace(/,/g, ''));
+  const type   = (item['매매구분'] || '').includes('매도') ? '매도' : '매수';
+  const date   = item['체결일자'] || '';
+  const id     = 'meritz_' + (item['timestamp'] || Date.now());
+  return { id, symbol, type, price, qty, amount, date, source: 'meritz' };
+}
+
+async function pollMeritz() {
+  const token = state.gistToken, gistId = state.gistId;
+  if (!token || !gistId) return;
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const content = data.files['meritz_trades.json']?.content;
+    if (!content) return;
+    let items;
+    try {
+      const parsed = JSON.parse(content);
+      items = Array.isArray(parsed) ? parsed : [parsed];
+    } catch(e) { return; }
+    const existingIds = new Set(state.pending.map(p => p.id));
+    const newItems = items
+      .map(parseMeritzItem)
+      .filter(t => t.symbol && !existingIds.has(t.id));
+    if (!newItems.length) return;
+    state.pending = [...state.pending, ...newItems];
+    renderPending();
+    showToast(`${newItems.length}건 신규 체결 감지`);
+    saveLocal();
+    if (Notification.permission === 'granted') {
+      new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+      });
+    }
+    // 읽은 항목 Gist에서 초기화
+    await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'meritz_trades.json': { content: '[]' } } })
+    });
+  } catch(e) {}
+}
+
 function saveGistConfig() {
   state.gistToken = document.getElementById('token-input').value.trim();
   state.gistId = document.getElementById('gist-id-input').value.trim();
   saveLocal();
   showToast('설정 저장 완료');
+}
+
+function saveVrGistConfig() {
+  state.vrGistId = document.getElementById('vr-gist-id-input').value.trim();
+  saveLocal();
+  showToast('VR Gist ID 저장 완료');
+}
+
+async function sendToVR(id) {
+  const t = state.pending.find(x => x.id === id);
+  if (!t) return;
+  const token = state.gistToken;
+  const vrGistId = state.vrGistId;
+  if (!token || !vrGistId) { showToast('VR Gist ID를 먼저 설정해주세요'); return; }
+  try {
+    const res = await fetch(`https://api.github.com/gists/${vrGistId}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    let existing = [];
+    const content = data.files['vr_pending.json']?.content;
+    if (content) { try { existing = JSON.parse(content); } catch(e) {} }
+    existing.push({
+      id: t.id, type: t.type,
+      price: t.price, qty: t.qty, amount: t.amount,
+      date: t.date, timestamp: Date.now()
+    });
+    await fetch(`https://api.github.com/gists/${vrGistId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'vr_pending.json': { content: JSON.stringify(existing, null, 2) } } })
+    });
+    state.pending = state.pending.filter(x => x.id !== id);
+    renderPending();
+    await saveToGist();
+    showToast('✓ VR 대시보드로 전송 완료');
+  } catch(e) { showToast('전송 실패: ' + e.message); }
+}
+
+function saveFinnhubKey() {
+  state.finnhubKey = document.getElementById('finnhub-key-input').value.trim();
+  saveLocal();
+  showToast('✓ Finnhub 키 저장');
+  if (state.finnhubKey) fetchPrices();
+  else renderManualPrices();
+}
+
+async function fetchPrices() {
+  const symbols = [...new Set(state.portfolios.filter(p => !p.ended).map(p => p.symbol))];
+  if (!symbols.length) return;
+  const info = document.getElementById('price-sync-info');
+  if (!state.finnhubKey) {
+    if (info) info.innerHTML = `<span class="sync-dot dot-wait"></span>API키 없음 — 수동 입력`;
+    renderManualPrices();
+    return;
+  }
+  let updated = 0;
+  for (const sym of symbols) {
+    try {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${state.finnhubKey}`);
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      if (data.c > 0) { state.prices[sym] = parseFloat(data.c.toFixed(2)); updated++; }
+    } catch(e) {}
+  }
+  saveLocal();
+  const now = new Date().toLocaleTimeString('ko-KR');
+  if (info) {
+    if (updated > 0) info.innerHTML = `<span class="sync-dot dot-ok"></span>갱신됨 · ${now}`;
+    else info.innerHTML = `<span class="sync-dot dot-err"></span>조회 실패 — 수동 입력`;
+  }
+  if (updated < symbols.length) renderManualPrices();
+  renderAll();
+}
+
+function setManualPrice(symbol, val) {
+  const price = parseFloat(val);
+  if (price > 0) { state.prices[symbol] = price; saveLocal(); renderAll(); }
+}
+
+function renderManualPrices() {
+  const el = document.getElementById('manual-prices');
+  if (!el) return;
+  const symbols = [...new Set(state.portfolios.filter(p => !p.ended).map(p => p.symbol))];
+  if (!symbols.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-size:12px;color:var(--text4);margin-bottom:8px">수동 현재가 입력</div>`
+    + symbols.map(sym => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:700;color:var(--text1);min-width:48px">${sym}</span>
+        <input class="form-input" type="number" step="0.01" style="flex:1"
+          value="${state.prices[sym] || ''}" placeholder="현재가"
+          onchange="setManualPrice('${sym}', this.value)" />
+        ${state.prices[sym] ? `<span style="font-size:12px;color:var(--text3)">$${state.prices[sym].toFixed(2)}</span>` : ''}
+      </div>`).join('');
+}
+
+function saveTotalSeed() {
+  const val = parseFloat(document.getElementById('total-seed-input').value) || 0;
+  state.totalSeed = val;
+  saveLocal();
+  renderSummary();
+  const allocated = state.portfolios.filter(p => !p.ended).reduce((s,p) => s + p.seed, 0);
+  const info = document.getElementById('total-seed-info');
+  if (info) info.textContent = val > 0 ? `배정: $${allocated.toLocaleString()} / 잔여: $${(val - allocated).toLocaleString()}` : '';
+  showToast('✓ 총 시드 저장 완료');
+}
+
+function saveInitialTotalSeed() {
+  const val = parseFloat(document.getElementById('initial-seed-input').value) || 0;
+  if (!val) { showToast('최초 시드를 입력해주세요'); return; }
+  state.initial_totalSeed = val;
+  saveLocal();
+  renderSummary();
+  renderSettings();
+  showToast('✓ 최초 시드 저장 완료');
+}
+
+function resetSeedPeriod() {
+  const init = state.initial_totalSeed || 0;
+  const cur  = state.totalSeed || 0;
+  if (!init) { showToast('최초 시드를 먼저 입력해주세요'); return; }
+  const profit = parseFloat((cur - init).toFixed(2));
+  const yPct   = parseFloat((profit / init * 100).toFixed(2));
+  const date   = new Date().toISOString().split('T')[0];
+  if (!state.seed_history) state.seed_history = [];
+  state.seed_history.unshift({ date, initial_seed: init, final_seed: cur, profit, yield_pct: yPct });
+  state.initial_totalSeed = cur;
+  document.getElementById('initial-seed-input').value = cur;
+  saveLocal();
+  renderSummary();
+  renderCycle();
+  renderSettings();
+  showToast(`✓ 리셋 완료 — 기간 수익 $${profit} (${yPct}%) 기록됨`);
 }
 
 function setSyncStatus(s) {
@@ -814,20 +1085,43 @@ function setSyncStatus(s) {
 // ══════════════════════════════════════════════
 //  CALC
 // ══════════════════════════════════════════════
-function calcM(p) { return (p.seed / p.D) + (p.acc_profit / (2 * p.D)); }
+function calcM(p) {
+  const invested = p.avg_price * p.hold_qty;
+  const rem = p.D - p.t_value;
+  return rem > 0 ? (p.seed - invested) / rem : p.seed / p.D;
+}
 function calcStarRate(p) { return p.R - (2 * p.R / p.D) * p.t_value; }
 function calcStarP(p) { return p.avg_price > 0 ? p.avg_price * (1 + calcStarRate(p) / 100) : 0; }
 function calcBuyP(p) { const sp = calcStarP(p); return sp > 0 ? parseFloat((sp - 0.01).toFixed(2)) : 0; }
 function calcSellP(p) { return p.avg_price > 0 ? parseFloat((p.avg_price * (1 + p.R / 100)).toFixed(2)) : 0; }
 function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
-function avgQty(p) { return p.avg_price > 0 ? Math.floor(halfM(p) / p.avg_price) : 0; }
-function starQty(p) { const bp = calcBuyP(p); return bp > 0 ? Math.floor(halfM(p) / bp) : 0; }
-function sell25qty(p) { return p.hold_qty - Math.floor(p.hold_qty * 0.75); }
-function sell75qty(p) { return Math.floor(p.hold_qty * 0.75); }
+function calcBuyQtys(p) {
+  const M = calcM(p);
+  const starP = calcBuyP(p);
+  const avgP = p.avg_price;
+  if (!starP || !avgP || M <= 0) return { xQty: 0, yQty: 0 };
+  const maxAtAvg  = Math.floor(M / avgP);
+  const maxAtStar = Math.floor(M / starP);
+  const Y = Math.floor(maxAtStar / 2);
+  const X = Math.max(0, maxAtAvg - Y);
+  return { xQty: X, yQty: Y };
+}
+function avgQty(p)  { return calcBuyQtys(p).xQty; }
+function starQty(p) { return calcBuyQtys(p).yQty; }
+function sell25qty(p) { return p.hold_qty - Math.round(p.hold_qty * 0.75); }
+function sell75qty(p) { return Math.round(p.hold_qty * 0.75); }
 function ladderPrices(p) {
-  const base = calcBuyP(p); if (!base) return [];
-  return Array.from({length:6}, (_,i) => parseFloat((base * (1 - 0.03 * (i+1))).toFixed(2)));
+  const M = calcM(p);
+  const { xQty, yQty } = calcBuyQtys(p);
+  const N = xQty + yQty;
+  if (!N || M <= 0) return [];
+  const result = [];
+  for (let i = 1; i <= 6; i++) {
+    const price = parseFloat((M / (N + i)).toFixed(2));
+    if (price > 0) result.push({ price, qty: 1 });
+  }
+  return result;
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
@@ -849,18 +1143,37 @@ function renderAll() {
 // ══════════════════════════════════════════════
 function renderSummary() {
   const ps = state.portfolios.filter(p => !p.ended);
-  const totalSeed = ps.reduce((s,p) => s + p.seed, 0);
-  const totalInvested = ps.reduce((s,p) => s + p.avg_price * p.hold_qty, 0);
+  const totalSeed = state.totalSeed || 0;
+  const allocatedSeed = ps.reduce((s,p) => s + p.seed, 0);
+  const remaining = totalSeed - allocatedSeed;
   const totalProfit = state.portfolios.reduce((s,p) => s + p.acc_profit, 0);
   const avgProg = ps.length ? ps.reduce((s,p) => s + calcProg(p), 0) / ps.length : 0;
-  const yPct = totalSeed > 0 ? (totalProfit / totalSeed * 100) : 0;
-  document.getElementById('s-seed').textContent = '$' + totalSeed.toLocaleString();
-  document.getElementById('s-invested').textContent = '$' + totalInvested.toFixed(0);
+  const initTotal = state.initial_totalSeed || 0;
+  const yPct = initTotal > 0 ? ((totalSeed - initTotal) / initTotal * 100) : 0;
+  const seedDiff = initTotal > 0 && totalSeed !== initTotal;
+  document.getElementById('s-seed').innerHTML = totalSeed > 0
+    ? `$${totalSeed.toLocaleString()}${seedDiff ? `<br><span style="font-size:11px;color:var(--text4);font-weight:400">최초 $${initTotal.toLocaleString()}</span>` : ''}`
+    : '-';
+  document.getElementById('s-invested').textContent = '$' + allocatedSeed.toLocaleString();
   document.getElementById('s-count').textContent = ps.length + '개';
   document.getElementById('s-prog').style.width = avgProg.toFixed(1) + '%';
   document.getElementById('s-pct').textContent = avgProg.toFixed(1) + '%';
   document.getElementById('s-profit').textContent = '$' + totalProfit.toLocaleString();
   document.getElementById('s-yield').textContent = yPct.toFixed(2) + '%';
+  const remainEl = document.getElementById('s-remain');
+  const remainRow = document.getElementById('s-remain-row');
+  if (totalSeed > 0) {
+    remainRow.style.display = 'block';
+    if (remaining < 0) {
+      remainEl.textContent = '-$' + Math.abs(remaining).toLocaleString() + ' ⚠️ 초과';
+      remainEl.style.color = '#f87171';
+    } else {
+      remainEl.textContent = '$' + remaining.toLocaleString();
+      remainEl.style.color = '#4ade80';
+    }
+  } else {
+    remainRow.style.display = 'none';
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -880,7 +1193,19 @@ function renderMainCards() {
     const sp = calcStarP(p);
     const sr = calcStarRate(p).toFixed(2);
     const ladder = ladderPrices(p);
-    const totalFunds = p.avg_price*avgQty(p) + bp*starQty(p) + ladder.reduce((s,lp)=>s+lp,0);
+    const curP = state.prices[p.symbol];
+    const pnlPct = (curP && p.avg_price > 0) ? ((curP - p.avg_price) / p.avg_price * 100) : null;
+    const pnlTag = pnlPct !== null
+      ? `<span style="font-size:10px;font-weight:700;color:${pnlPct>=0?'#4ade80':'#f87171'};margin-left:3px">${pnlPct>=0?'▲':'▼'}${Math.abs(pnlPct).toFixed(1)}%</span>`
+      : '';
+    const evalAmt = curP ? `$${(curP * p.hold_qty).toFixed(0)}` : '-';
+    const invested = p.avg_price * p.hold_qty;
+    const initSeedP = p.initial_seed || p.seed;
+    const portYield = initSeedP > 0 ? (p.acc_profit / initSeedP * 100) : 0;
+    const portYieldTag = p.acc_profit !== 0
+      ? `<div style="font-size:11px;color:${portYield>=0?'#4ade80':'#f87171'};margin-top:2px;font-weight:600">${portYield>=0?'▲':'▼'}${Math.abs(portYield).toFixed(2)}% ($${p.acc_profit.toFixed(0)})</div>`
+      : '<div style="font-size:11px;color:var(--text4);margin-top:2px">수익 0</div>';
+    const initialSeedTag = `<div style="font-size:11px;color:var(--text4);margin-top:1px">최초 $${initSeedP.toLocaleString()}</div>`;
     return `
     <div class="port-card">
       <div class="pc-head">
@@ -892,13 +1217,17 @@ function renderMainCards() {
           <div>
             <div class="pc-symbol">${p.symbol}</div>
             <div class="pc-sub">${p.name} · D=${p.D}</div>
+            ${portYieldTag}
+            ${initialSeedTag}
           </div>
           <div class="pc-info-box">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px">
-              <div class="metric" style="background:transparent;padding:0"><div class="m-label">평단가</div><div class="m-val" style="font-size:13px">$${p.avg_price.toFixed(2)}</div></div>
-              <div class="metric" style="background:transparent;padding:0"><div class="m-label">보유수량</div><div class="m-val" style="font-size:13px">${p.hold_qty}주</div></div>
-              <div class="metric" style="background:transparent;padding:0"><div class="m-label">매입금액</div><div class="m-val" style="font-size:13px">$${(p.avg_price*p.hold_qty).toFixed(0)}</div></div>
-              <div class="metric" style="background:transparent;padding:0"><div class="m-label">총예수금</div><div class="m-val" style="font-size:13px;color:#4ade80">$${totalFunds.toFixed(0)}</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 8px">
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">평단가</div><div class="m-val" style="font-size:12px">$${p.avg_price.toFixed(2)}${pnlTag}</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">보유수량</div><div class="m-val" style="font-size:12px">${p.hold_qty}주</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">5일예수금</div><div class="m-val" style="font-size:12px;color:#4ade80">$${(5*calcM(p)).toFixed(0)}</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">할당시드</div><div class="m-val" style="font-size:12px">$${p.seed.toLocaleString()}</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">매입금액</div><div class="m-val" style="font-size:12px">$${invested.toFixed(0)}</div></div>
+              <div class="metric" style="background:transparent;padding:0"><div class="m-label">평가금액</div><div class="m-val" style="font-size:12px;color:${curP&&curP>p.avg_price?'#4ade80':curP&&curP<p.avg_price?'#f87171':'var(--text1)'}">${evalAmt}</div></div>
             </div>
           </div>
         </div>
@@ -907,21 +1236,19 @@ function renderMainCards() {
         <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${prog.toFixed(1)}%;background:${color}"></div></div>
         <div class="pc-pct" style="color:${color}">${prog.toFixed(1)}%</div>
       </div>
-      <div class="section-head"><span class="section-badge s-buy">매수</span><button class="fund-toggle-btn" data-port="${p.id}" onclick="toggleFunds('${p.id}')">예수금 ▾</button></div>
+      <div class="section-head"><span class="section-badge s-buy">매수</span></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
         <div class="o-val">$${p.avg_price.toFixed(2)} × ${avgQty(p)}주</div>
       </div>
-      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1줄까지 필요</span><span class="fund-amount">$${(p.avg_price*avgQty(p)).toFixed(0)}</span></div>
       <div class="order-row">
         <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct">${sr}%</span></div>
         <div class="o-val">$${bp.toFixed(2)} × ${starQty(p)}주</div>
       </div>
-      <div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~2줄 누적</span><span class="fund-amount">$${(p.avg_price*avgQty(p)+bp*starQty(p)).toFixed(0)}</span></div>
       <div class="ladder-wrap">
         <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
         <div class="ladder-list">
-          ${ladder.map((lp, i) => { const cum = p.avg_price*avgQty(p)+bp*starQty(p)+ladder.slice(0,i+1).reduce((s,x)=>s+x,0); return `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${lp.toFixed(2)}</span><span class="l-qty">× 1주</span></div><div class="fund-row" data-port="${p.id}"><span class="fund-label">▸ 1~${i+3}줄 누적</span><span class="fund-amount">$${cum.toFixed(0)}</span></div>`; }).join('')}
+          ${ladder.map(l => `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`).join('')}
         </div>
       </div>
       <div class="section-head"><span class="section-badge s-sell">매도</span></div>
@@ -950,6 +1277,8 @@ function openDetail(id) {
   const bp = calcBuyP(p);
   const mVal = calcM(p);
   const used = (p.avg_price * p.hold_qty).toFixed(2);
+  const dCurP = state.prices[p.symbol];
+  const dPnl  = (dCurP && p.avg_price > 0) ? ((dCurP - p.avg_price) / p.avg_price * 100) : null;
   document.getElementById('d-ver').textContent = 'Ver ' + p.version;
   document.getElementById('d-ver2').textContent = 'Ver ' + p.version;
   document.getElementById('d-symbol').textContent = p.symbol;
@@ -957,10 +1286,13 @@ function openDetail(id) {
   document.getElementById('d-pct').textContent = prog.toFixed(1) + '%';
   document.getElementById('d-tsub').textContent = p.t_value + 'T / ' + p.D;
   document.getElementById('d-date').textContent = (p.start_date || '-') + ' ~';
-  document.getElementById('d-seed').textContent = '$' + p.seed.toLocaleString();
+  const initSeed = p.initial_seed || p.seed;
+  const seedChanged = initSeed !== p.seed;
+  document.getElementById('d-seed').innerHTML = `$${p.seed.toLocaleString()}${seedChanged ? `<br><span style="font-size:11px;color:var(--text4);font-weight:400">최초 $${initSeed.toLocaleString()}</span>` : ''}`;
   document.getElementById('d-used').textContent = '$' + used;
   document.getElementById('d-m').textContent = '$' + mVal.toFixed(2);
-  document.getElementById('d-avg').textContent = '$' + p.avg_price.toFixed(2);
+  document.getElementById('d-avg').innerHTML = '$' + p.avg_price.toFixed(2)
+    + (dPnl !== null ? ` <span style="font-size:12px;font-weight:700;color:${dPnl>=0?'#4ade80':'#f87171'}">(${dPnl>=0?'▲':'▼'}${Math.abs(dPnl).toFixed(1)}%)</span>` : '');
   document.getElementById('d-qty').textContent = p.hold_qty + '주';
   document.getElementById('d-invested').textContent = '$' + used;
   document.getElementById('d-t').textContent = p.t_value;
@@ -974,8 +1306,8 @@ function openDetail(id) {
   document.getElementById('g-sell2-pct').textContent = p.R + '%';
   document.getElementById('g-sell2').textContent = '$' + calcSellP(p).toFixed(2) + ' × ' + sell75qty(p) + '주';
   const ladder = ladderPrices(p);
-  document.getElementById('d-ladder').innerHTML = ladder.map(price =>
-    `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${price.toFixed(2)}</span><span class="l-qty">× 1주</span></div>`
+  document.getElementById('d-ladder').innerHTML = ladder.map(l =>
+    `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`
   ).join('');
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
@@ -1050,7 +1382,12 @@ async function confirmInput() {
     const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
     p.hold_qty += t.qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
+    const tInc = segs.tInc;
+    if (tInc === '+1') {
+      p.t_value = Math.round((p.t_value + 1) * 10) / 10;
+    } else if (tInc === '+0.5') {
+      p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
+    } // '+0': 변동 없음
     if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - t.qty);
@@ -1061,6 +1398,10 @@ async function confirmInput() {
   document.getElementById('confirm-section').style.display = 'none';
   document.getElementById('success-box').style.display = 'block';
   document.getElementById('success-msg').textContent = `${p.name} ${t.type} ${t.qty}주 @ $${t.price.toFixed(2)}` + (t.type==='매수'?` · T=${p.t_value}`:'');
+  if (pendingConfirmId) {
+    state.pending = state.pending.filter(x => x.id !== pendingConfirmId);
+    pendingConfirmId = null;
+  }
   parsedTrade = null;
   renderAll();
   await saveToGist();
@@ -1071,6 +1412,7 @@ function ignoreInput() {
   document.getElementById('parse-result').style.display = 'none';
   document.getElementById('confirm-section').style.display = 'none';
   parsedTrade = null;
+  pendingConfirmId = null;
 }
 
 function openManualInput(type) {
@@ -1090,10 +1432,25 @@ function openManualInput(type) {
 // ══════════════════════════════════════════════
 //  CYCLE END
 // ══════════════════════════════════════════════
+function calcCycleProfit(p) {
+  const trades = p.trades || [];
+  const buyTotal  = trades.filter(t => t.type === '매수').reduce((s, t) => s + (t.amount || t.price * t.qty), 0);
+  const sellTotal = trades.filter(t => t.type === '매도').reduce((s, t) => s + (t.amount || t.price * t.qty), 0);
+  return { profit: parseFloat((sellTotal - buyTotal).toFixed(2)), buyTotal, sellTotal };
+}
+
 function checkCycleEnd(id) {
   endingId = id;
   const p = state.portfolios.find(x => x.id === id);
-  document.getElementById('end-profit').value = '';
+  const { profit, buyTotal, sellTotal } = calcCycleProfit(p);
+  document.getElementById('end-profit').value = profit !== 0 ? profit : '';
+  const sub = document.getElementById('end-sub');
+  if (sub) {
+    const breakdown = buyTotal || sellTotal
+      ? `매수 $${buyTotal.toFixed(2)} / 매도 $${sellTotal.toFixed(2)} → 수익 <strong>$${profit.toFixed(2)}</strong><br>수익의 50%가 다음 사이클 시드에 자동 추가됩니다`
+      : `수익의 50%가 다음 사이클 시드에 자동 추가됩니다`;
+    sub.innerHTML = breakdown;
+  }
   setSeg(document.querySelector('#seg-seed .seg-btn'), 'seed');
   document.getElementById('end-overlay').classList.add('open');
 }
@@ -1105,16 +1462,17 @@ async function endCycle() {
   if (!p) return;
   const profit = parseFloat(document.getElementById('end-profit').value) || 0;
   const endOnly = segs.seed === '종료만';
-  const useProfitSeed = segs.seed === '수익 포함';
   const today = new Date().toISOString().split('T')[0];
   if (!p.cycles) p.cycles = [];
   p.cycles.push({ no: p.cycles.length+1, start: p.start_date, end: today, seed: p.seed, profit, trades_count:(p.trades||[]).length, trades:[...(p.trades||[])] });
   p.acc_profit += profit;
+  state.totalSeed = parseFloat((state.totalSeed + profit).toFixed(2));
+  const tsel = document.getElementById('total-seed-input');
+  if (tsel) tsel.value = state.totalSeed;
   if (endOnly) {
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true;
   } else {
-    const newSeed = useProfitSeed ? p.seed + profit : p.seed;
-    p.seed = newSeed;
+    if (profit > 0) p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = [];
   }
   closeEndOverlay();
@@ -1137,6 +1495,7 @@ function renderPending() {
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:16px;font-weight:700;color:var(--text1)">${t.symbol}</span>
           <span class="badge ${t.type==='매수'?'badge-buy':'badge-sell'}">${t.type}</span>
+          ${t.source==='meritz'?'<span class="badge badge-wait" style="font-size:10px">자동감지</span>':''}
         </div>
         <span style="font-size:12px;color:var(--text3)">${t.date}</span>
       </div>
@@ -1147,6 +1506,7 @@ function renderPending() {
       </div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="resolvePending('${t.id}',false)">무시</button>
+        ${t.symbol === 'TQQQ' && state.vrGistId ? `<button class="btn-vr" onclick="sendToVR('${t.id}')">VR로 ↗</button>` : ''}
         <button class="btn-primary" onclick="resolvePendingInput('${t.id}')">입력하기</button>
       </div>
     </div>`).join('');
@@ -1165,6 +1525,7 @@ async function resolvePending(id, confirm) {
 function resolvePendingInput(id) {
   const t = state.pending.find(x => x.id === id);
   if (!t) return;
+  pendingConfirmId = id;
   parsedTrade = t;
   document.getElementById('p-symbol').textContent = t.symbol;
   document.getElementById('p-type').textContent = t.type;
@@ -1178,8 +1539,6 @@ function resolvePendingInput(id) {
   if (!matched.length) { showToast(`운영 중인 ${t.symbol} 포트폴리오가 없어요`, 3000); return; }
   document.getElementById('target-port').innerHTML = matched.map(p=>`<option value="${p.id}">${p.name} (${p.symbol})</option>`).join('');
   document.getElementById('confirm-section').style.display = 'block';
-  state.pending = state.pending.filter(x => x.id !== id);
-  renderPending();
 }
 
 // ══════════════════════════════════════════════
@@ -1275,6 +1634,24 @@ function renderCycle() {
       </div>
     </div>`;
   }).join('');
+  const sh = state.seed_history || [];
+  const shEl = document.getElementById('seed-history-list');
+  if (shEl) {
+    shEl.innerHTML = sh.length ? sh.map(h => `
+      <div class="cycle-card" style="border-left:3px solid #60a5fa">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:2px">${h.date} 기준 리셋</div>
+            <div style="font-size:13px;color:var(--text1)">최초 $${(h.initial_seed||0).toLocaleString()} → $${(h.final_seed||0).toLocaleString()}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:15px;font-weight:700;color:${h.profit>=0?'#4ade80':'#f87171'}">${h.profit>=0?'+':''}$${h.profit}</div>
+            <div style="font-size:12px;color:var(--text3)">${h.profit>=0?'+':''}${h.yield_pct}%</div>
+          </div>
+        </div>
+      </div>`).join('')
+    : '';
+  }
   document.getElementById('cycle-list').innerHTML = filtered.length
     ? filtered.map((c,i) => {
         const yp = (c.profit/c.seed*100).toFixed(2);
@@ -1317,7 +1694,10 @@ function daysDiff(a, b) {
 // ══════════════════════════════════════════════
 function renderSettings() {
   const el = document.getElementById('settings-list');
-  el.innerHTML = state.portfolios.filter(p => !p.ended).map(p => {
+  const gistWarn = !state.gistToken
+    ? `<div style="background:rgba(239,68,68,0.1);border:0.5px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:#f87171">⚠️ Gist 미설정 — 데이터가 이 기기에만 저장됩니다</div>`
+    : '';
+  el.innerHTML = gistWarn + state.portfolios.filter(p => !p.ended).map(p => {
     const iconClass = p.symbol === 'SOXL' ? 'icon-soxl' : p.symbol === 'TQQQ' ? 'icon-tqqq' : 'icon-other';
     return `<div class="port-list-item">
       <div class="pli-icon ${iconClass}">${p.symbol.substring(0,4)}</div>
@@ -1331,6 +1711,26 @@ function renderSettings() {
       </div>
     </div>`;
   }).join('') || '<div style="color:var(--text3);font-size:13px;padding:16px;text-align:center">아직 무매가 없어요</div>';
+  if (!state.finnhubKey) renderManualPrices();
+  const tsi = document.getElementById('total-seed-input');
+  if (tsi) tsi.value = state.totalSeed || '';
+  const isi = document.getElementById('initial-seed-input');
+  if (isi) isi.value = state.initial_totalSeed || '';
+  const isd = document.getElementById('initial-seed-display');
+  if (isd) {
+    const init = state.initial_totalSeed || 0;
+    const cur  = state.totalSeed || 0;
+    if (init > 0) {
+      const diff = parseFloat((cur - init).toFixed(2));
+      const pct  = (diff / init * 100).toFixed(2);
+      const color = diff >= 0 ? '#4ade80' : '#f87171';
+      isd.innerHTML = `현재 수익률: <span style="color:${color};font-weight:600">${diff >= 0 ? '+' : ''}${pct}%</span> (${diff >= 0 ? '+' : ''}$${diff.toLocaleString()})`;
+    } else {
+      isd.textContent = '';
+    }
+  }
+  const fki = document.getElementById('finnhub-key-input');
+  if (fki && state.finnhubKey) fki.value = state.finnhubKey;
 }
 
 // ══════════════════════════════════════════════
@@ -1340,7 +1740,7 @@ function openAddSheet() {
   editingId = null;
   document.getElementById('add-sheet-title').textContent = '새 무매 추가';
   document.getElementById('del-btn').style.display = 'none';
-  ['f-name','f-seed','f-r','f-t','f-avg','f-qty','f-profit'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-seed','f-initial-seed','f-r','f-t','f-avg','f-qty','f-profit'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
   resetSegs();
   document.getElementById('add-overlay').classList.add('open');
@@ -1354,6 +1754,7 @@ function openEditSheet(id) {
   document.getElementById('del-btn').style.display = 'block';
   document.getElementById('f-name').value = p.name;
   document.getElementById('f-seed').value = p.seed;
+  document.getElementById('f-initial-seed').value = p.initial_seed || p.seed;
   document.getElementById('f-r').value = p.R;
   document.getElementById('f-t').value = p.t_value;
   document.getElementById('f-avg').value = p.avg_price;
@@ -1371,21 +1772,31 @@ function closeAddSheet() { document.getElementById('add-overlay').classList.remo
 async function savePortfolio() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('이름을 입력해주세요'); return; }
+  const seedVal = parseFloat(document.getElementById('f-seed').value) || 5000;
+  const initialSeedVal = parseFloat(document.getElementById('f-initial-seed').value) || seedVal;
   const data = {
     name, version: segs.ver, symbol: segs.sym, D: parseInt(segs.d),
     R: parseFloat(document.getElementById('f-r').value) || (segs.sym==='SOXL'?20:15),
-    seed: parseFloat(document.getElementById('f-seed').value) || 5000,
+    seed: seedVal,
     t_value: parseFloat(document.getElementById('f-t').value) || 0,
     avg_price: parseFloat(document.getElementById('f-avg').value) || 0,
     hold_qty: parseInt(document.getElementById('f-qty').value) || 0,
     acc_profit: parseFloat(document.getElementById('f-profit').value) || 0,
     start_date: document.getElementById('f-date').value
   };
+  if (state.totalSeed > 0) {
+    const currentAllocated = state.portfolios
+      .filter(p => !p.ended && p.id !== editingId)
+      .reduce((s,p) => s + p.seed, 0);
+    if (currentAllocated + data.seed > state.totalSeed) {
+      showToast(`⚠️ 총 시드 초과! 배정 $${(currentAllocated + data.seed).toLocaleString()} / 총 $${state.totalSeed.toLocaleString()}`, 3500);
+    }
+  }
   if (editingId) {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
-    state.portfolios[idx] = { ...state.portfolios[idx], ...data };
+    state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: initialSeedVal };
   } else {
-    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], ...data });
+    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, ...data });
   }
   closeAddSheet();
   renderAll();
@@ -1421,7 +1832,7 @@ function setSeg(el, group) {
 }
 
 function setSegVal(group, val) {
-  const mapId = { ver:'seg-ver', sym:'seg-sym', d:'seg-d', seed:'seg-seed', manualType:'seg-manual-type', editType:'seg-edit-type' };
+  const mapId = { ver:'seg-ver', sym:'seg-sym', d:'seg-d', seed:'seg-seed', manualType:'seg-manual-type', editType:'seg-edit-type', tInc:'seg-t-inc', tIncManual:'seg-t-inc-manual' };
   const container = document.getElementById(mapId[group]);
   if (!container) return;
   container.querySelectorAll('.seg-btn').forEach(b => { b.classList.toggle('active', b.textContent.trim() === val); });
@@ -1483,7 +1894,12 @@ async function confirmManualInput() {
     const totalCost = p.avg_price * p.hold_qty + price * qty;
     p.hold_qty += qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
+    const tIncM = segs.tIncManual;
+    if (tIncM === '+1') {
+      p.t_value = Math.round((p.t_value + 1) * 10) / 10;
+    } else if (tIncM === '+0.5') {
+      p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
+    } // '+0': 변동 없음
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - qty);
     if (p.hold_qty === 0) { closeManualOverlay(); checkCycleEnd(pid); return; }
@@ -1594,7 +2010,7 @@ function recalcPortfolio(p) {
       const totalCost = avgPrice * qty + t.price * t.qty;
       qty += t.qty;
       avgPrice = qty > 0 ? totalCost / qty : 0;
-      tVal = Math.round((tVal + 0.5) * 10) / 10;
+      tVal = tVal === 0 ? 1 : Math.round((tVal + 0.5) * 10) / 10;
     } else {
       qty = Math.max(0, qty - t.qty);
       if (qty === 0) avgPrice = 0;
@@ -1611,22 +2027,12 @@ function recalcPortfolio(p) {
 function showSeedLabel(restart) {
   const el = document.getElementById('end-sub');
   if (el) el.textContent = restart
-    ? '종료 후 다음 사이클의 시드를 선택해주세요'
+    ? '수익의 50%가 다음 사이클 시드에 자동 추가됩니다'
     : '사이클을 종료하고 포트폴리오를 보관 상태로 전환합니다';
 }
 
 function autoEndCycle(p) { checkCycleEnd(p.id); }
 
-// ══════════════════════════════════════════════
-//  예수금 토글
-// ══════════════════════════════════════════════
-function toggleFunds(portId) {
-  fundToggles[portId] = !fundToggles[portId];
-  const open = fundToggles[portId];
-  document.querySelectorAll(`.fund-row[data-port="${portId}"]`).forEach(r => r.style.display = open ? 'flex' : 'none');
-  const btn = document.querySelector(`.fund-toggle-btn[data-port="${portId}"]`);
-  if (btn) btn.textContent = open ? '예수금 ▴' : '예수금 ▾';
-}
 
 // ══════════════════════════════════════════════
 //  주문 검증 (포트별)
@@ -1652,24 +2058,51 @@ function clearVerify() {
 function runVerify() {
   const text = document.getElementById('verify-text').value.trim();
   if (!text) { showToast('내용을 붙여넣어 주세요'); return; }
-  const lines = text.split('\n').filter(l => l.trim());
-  const orders = [];
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+  const orderRows = [], ladderRows = [];
+  let mode = null;
   for (const line of lines) {
     const cols = line.split('\t');
-    if (cols.length < 9) continue;
-    if (cols[4] === '종목코드' || cols[6] === '매매구분') continue;
-    const symbol = (cols[4]||'').trim().toUpperCase();
-    const type = (cols[6]||'').trim();
-    const qty = parseInt((cols[7]||'').replace(/,/g,'')) || 0;
-    const price = parseFloat((cols[8]||'').replace(/,/g,'')) || 0;
-    if (!symbol || !type || !qty || !price) continue;
-    orders.push({ symbol, type, qty, price });
+    if (cols.some(c => c.trim() === '주문#'))   { mode = 'order';  continue; }
+    if (cols.some(c => c.trim() === '예약번호')) { mode = 'ladder'; continue; }
+    if (!mode || cols.length < 8) continue;
+    if (mode === 'order') {
+      // col4:주문유형 col5:매매구분 col6:종목코드 col8:주문가 col9:주문량
+      const type   = (cols[5]||'').trim();
+      const symbol = (cols[6]||'').trim().toUpperCase();
+      const price  = parseFloat((cols[8]||'').replace(/,/g,'')) || 0;
+      const qty    = parseInt((cols[9]||'').replace(/,/g,''))   || 0;
+      if (!symbol || !type || !price || !qty) continue;
+      orderRows.push({ symbol, type, price, qty });
+    } else {
+      // col5:종목코드 col7:매매구분 col8:예약수량 col9:예약가격
+      const symbol = (cols[5]||'').trim().toUpperCase();
+      const type   = (cols[7]||'').trim();
+      const qty    = parseInt((cols[8]||'').replace(/,/g,''))   || 0;
+      const price  = parseFloat((cols[9]||'').replace(/,/g,'')) || 0;
+      if (!symbol || !type || !price || !qty) continue;
+      ladderRows.push({ symbol, type, price, qty });
+    }
   }
-  if (!orders.length) { showToast('파싱된 주문이 없어요. 형식을 확인해주세요'); return; }
-  const results = orders.map(o => verifyOrder(o, verifyPortId));
-  const okCount = results.filter(r => r.status === 'ok').length;
-  const summary = `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border);margin-bottom:12px"><span style="font-size:13px;color:var(--text3)">총 ${results.length}건</span><span><span style="color:#4ade80;font-weight:700">${okCount}건 정상</span> <span style="color:var(--text4);margin:0 4px">|</span> <span style="color:#f87171;font-weight:700">${results.length-okCount}건 불일치</span></span></div>`;
-  document.getElementById('verify-results').innerHTML = summary + results.map(r => renderVerifyResult(r)).join('');
+  if (!orderRows.length && !ladderRows.length) { showToast('파싱된 주문이 없어요. 형식을 확인해주세요'); return; }
+  let html = '';
+  function sectionSummary(results) {
+    const ok = results.filter(r => r.status === 'ok').length;
+    return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);margin-bottom:10px">
+      <span style="font-size:12px;color:var(--text3)">총 ${results.length}건</span>
+      <span><span style="color:#4ade80;font-weight:700">${ok}건 정상</span><span style="color:var(--text4);margin:0 4px">|</span><span style="color:#f87171;font-weight:700">${results.length-ok}건 불일치</span></span></div>`;
+  }
+  if (orderRows.length) {
+    const results = orderRows.map(o => verifyOrder(o, verifyPortId));
+    html += `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">📋 매수/매도 주문</div>`;
+    html += sectionSummary(results) + results.map(r => renderVerifyResult(r)).join('');
+  }
+  if (ladderRows.length) {
+    const results = ladderRows.map(o => verifyLadder(o, verifyPortId));
+    html += `<div style="font-size:13px;font-weight:700;color:var(--text1);margin:${orderRows.length?'16px':0} 0 8px">🪜 사다리 주문</div>`;
+    html += sectionSummary(results) + results.map(r => renderVerifyResult(r)).join('');
+  }
+  document.getElementById('verify-results').innerHTML = html;
 }
 
 function verifyOrder(order, portId) {
@@ -1679,7 +2112,7 @@ function verifyOrder(order, portId) {
   const PRICE_TOL = 0.03;
   const bp = calcBuyP(p), sp = calcStarP(p), sellP = calcSellP(p), ladder = ladderPrices(p);
   const candidates = order.type === '매수'
-    ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((lp,i) => ({ label:`폭락${i+1}단`, price:lp, qty:1 }))]
+    ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((l,i) => ({ label:`폭락${i+1}단`, price:l.price, qty:l.qty }))]
     : [{ label:'25% LOC', price:sp, qty:sell25qty(p) }, { label:'75% 지정가', price:sellP, qty:sell75qty(p) }];
   for (const cand of candidates) {
     const pOk = Math.abs(order.price - cand.price) <= PRICE_TOL;
@@ -1690,6 +2123,23 @@ function verifyOrder(order, portId) {
   let closest = candidates[0], minDiff = Infinity;
   for (const cand of candidates) { const d = Math.abs(order.price - cand.price); if (d < minDiff) { minDiff = d; closest = cand; } }
   return { ...order, portName:p.name, status:'err', matched:closest.label, calcPrice:closest.price, calcQty:closest.qty, priceDiff:minDiff.toFixed(2) };
+}
+
+function verifyLadder(order, portId) {
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return { ...order, status:'no_port', detail:'포트폴리오 없음' };
+  if (p.symbol !== order.symbol) return { ...order, portName:p.name, status:'no_port', detail:`종목 불일치 (${p.symbol} 포트)` };
+  const PRICE_TOL = 0.05;
+  const ladder = ladderPrices(p);
+  for (let i = 0; i < ladder.length; i++) {
+    const l = ladder[i];
+    const pOk = Math.abs(order.price - l.price) <= PRICE_TOL;
+    const qOk = order.qty === l.qty;
+    if (pOk && qOk) return { ...order, portName:p.name, status:'ok',       matched:`사다리 ${i+1}단`, calcPrice:l.price, calcQty:l.qty };
+    if (pOk && !qOk) return { ...order, portName:p.name, status:'qty_warn', matched:`사다리 ${i+1}단`, calcPrice:l.price, calcQty:l.qty };
+  }
+  const closest = ladder.reduce((best, l) => Math.abs(order.price - l.price) < Math.abs(order.price - best.price) ? l : best, ladder[0] || { price:0, qty:1 });
+  return { ...order, portName:p.name, status:'err', matched:'사다리 불일치', calcPrice:closest.price, calcQty:closest.qty, priceDiff: Math.abs(order.price - closest.price).toFixed(2) };
 }
 
 function renderVerifyResult(r) {
