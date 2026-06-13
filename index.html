@@ -918,6 +918,7 @@ async function pollMeritz() {
     renderPending();
     showToast(`${newItems.length}건 신규 체결 감지`);
     saveLocal();
+    await saveToGist();
     if (Notification.permission === 'granted') {
       new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
     } else if (Notification.permission !== 'denied') {
