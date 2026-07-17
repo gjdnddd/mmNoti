@@ -398,7 +398,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="card">
       <div class="card-title">거래 내역</div>
       <table class="trade-table">
-        <thead><tr><th>날짜</th><th>구분</th><th>체결가</th><th>수량</th><th></th></tr></thead>
+        <thead><tr><th>날짜</th><th>구분</th><th>체결가</th><th>수량</th><th>T값</th><th></th></tr></thead>
         <tbody id="d-trades"></tbody>
       </table>
     </div>
@@ -1321,7 +1321,7 @@ function openDetail(id) {
   ).join('');
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
-    ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; return `<tr><td>${t.date}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
+    ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; return `<tr><td>${t.date}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${t.type==='매수'?(t.tInc||'+0.5'):'-'}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
     : '<tr><td colspan="5" style="color:var(--text3);padding:16px 0">거래 내역이 없어요</td></tr>';
   showScreen('detail');
   document.getElementById('screen-detail')._portId = id;
