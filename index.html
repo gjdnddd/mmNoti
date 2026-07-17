@@ -873,11 +873,12 @@ async function saveToGist() {
     const body = JSON.stringify({
       files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed, seed_history: state.seed_history }, null, 2) } }
     });
-    await fetch(`https://api.github.com/gists/${gistId}`, {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
       body
     });
+    if (!res.ok) throw new Error(res.status);
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
     saveLocal();
