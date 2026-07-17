@@ -735,6 +735,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <div class="seg-btn" onclick="setSeg(this,'editType')" style="color:#60a5fa">매도</div>
       </div>
     </div>
+    <div style="margin-bottom:14px" id="edit-t-inc-section">
+      <label class="form-label">T값 증가</label>
+      <div class="seg-ctrl" id="seg-edit-t-inc">
+        <div class="seg-btn" onclick="setSeg(this,'editTInc')">+1</div>
+        <div class="seg-btn active" onclick="setSeg(this,'editTInc')">+0.5</div>
+        <div class="seg-btn" onclick="setSeg(this,'editTInc')">+0</div>
+      </div>
+    </div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">날짜</label><input class="form-input" id="edit-trade-date" type="date" /></div>
       <div><label class="form-label">수량 (주)</label><input class="form-input" id="edit-trade-qty" type="number" /></div>
@@ -779,7 +787,7 @@ let parsedTrade = null;
 let pendingConfirmId = null;
 let histFilter = 'all';
 let cycleFilter = 'all';
-let segs = { ver:'4.0', sym:'SOXL', d:'40', seed:'기존 시드', manualType:'매수', editType:'매수', tInc:'+0.5', tIncManual:'+0.5' };
+let segs = { ver:'4.0', sym:'SOXL', d:'40', seed:'기존 시드', manualType:'매수', editType:'매수', tInc:'+0.5', tIncManual:'+0.5', editTInc:'+0.5' };
 
 // ══════════════════════════════════════════════
 //  INIT
@@ -1377,8 +1385,9 @@ async function confirmInput() {
   if (p.symbol !== parsedTrade.symbol) { showToast(`종목 불일치: ${p.symbol} 포트에 ${parsedTrade.symbol} 입력 불가`); return; }
   const t = parsedTrade;
   if (!p.trades) p.trades = [];
-  p.trades.push({ date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount });
-  state.trades.push({ ...t, portfolio:p.name, portfolioId:p.id });
+  const tIncVal = t.type === '매수' ? segs.tInc : undefined;
+  p.trades.push({ date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, tInc:tIncVal });
+  state.trades.push({ ...t, portfolio:p.name, portfolioId:p.id, tInc:tIncVal });
   if (t.type === '매수') {
     const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
     p.hold_qty += t.qty;
@@ -1387,7 +1396,7 @@ async function confirmInput() {
     if (tInc === '+1') {
       p.t_value = Math.round((p.t_value + 1) * 10) / 10;
     } else if (tInc === '+0.5') {
-      p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
+      p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
     } // '+0': 변동 없음
     if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
   } else {
@@ -1575,7 +1584,7 @@ function renderHistory() {
     <div class="hist-item">
       <div class="hi-left">
         <div class="hi-icon ${t.type==='매수'?'hi-buy':'hi-sell'}">${t.type}</div>
-        <div><div class="hi-name">${t.portfolio||''} · ${t.symbol}</div><div class="hi-meta">${t.date||''} · ${t.qty}주</div></div>
+        <div><div class="hi-name">${t.portfolio||''} · ${t.symbol}</div><div class="hi-meta">${t.date||''} · ${t.qty}주${t.type==='매수'&&t.tInc?' · T'+t.tInc:''}</div></div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="text-align:right"><div class="hi-amount">$${(t.amount||0).toFixed(2)}</div><div class="hi-price">@ $${t.price.toFixed(2)}</div></div>
@@ -1833,7 +1842,7 @@ function setSeg(el, group) {
 }
 
 function setSegVal(group, val) {
-  const mapId = { ver:'seg-ver', sym:'seg-sym', d:'seg-d', seed:'seg-seed', manualType:'seg-manual-type', editType:'seg-edit-type', tInc:'seg-t-inc', tIncManual:'seg-t-inc-manual' };
+  const mapId = { ver:'seg-ver', sym:'seg-sym', d:'seg-d', seed:'seg-seed', manualType:'seg-manual-type', editType:'seg-edit-type', tInc:'seg-t-inc', tIncManual:'seg-t-inc-manual', editTInc:'seg-edit-t-inc' };
   const container = document.getElementById(mapId[group]);
   if (!container) return;
   container.querySelectorAll('.seg-btn').forEach(b => { b.classList.toggle('active', b.textContent.trim() === val); });
@@ -1887,7 +1896,8 @@ async function confirmManualInput() {
   const dp = dateRaw.split('-');
   const date = dp.length === 3 ? `${dp[1]}/${dp[2]}` : dateRaw;
   const amount = price * qty + fee;
-  const trade = { date, type, price, qty, amount, fee };
+  const tIncVal = type === '매수' ? segs.tIncManual : undefined;
+  const trade = { date, type, price, qty, amount, fee, tInc: tIncVal };
   if (!p.trades) p.trades = [];
   p.trades.push(trade);
   state.trades.push({ ...trade, portfolio: p.name, portfolioId: p.id, symbol: p.symbol });
@@ -1899,7 +1909,7 @@ async function confirmManualInput() {
     if (tIncM === '+1') {
       p.t_value = Math.round((p.t_value + 1) * 10) / 10;
     } else if (tIncM === '+0.5') {
-      p.t_value = p.t_value === 0 ? 1 : Math.round((p.t_value + 0.5) * 10) / 10;
+      p.t_value = Math.round((p.t_value + 0.5) * 10) / 10;
     } // '+0': 변동 없음
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - qty);
@@ -1951,6 +1961,8 @@ function openTradeEdit(portId, tradeIdx) {
   if (!t) return;
   segs.editType = t.type;
   setSegVal('editType', t.type);
+  segs.editTInc = t.tInc || '+0.5';
+  setSegVal('editTInc', segs.editTInc);
   document.getElementById('edit-trade-date').value = toDateInput(t.date);
   document.getElementById('edit-trade-qty').value = t.qty;
   document.getElementById('edit-trade-price').value = t.price;
@@ -1981,7 +1993,10 @@ async function saveTradeEdit() {
   const dp = dateRaw.split('-');
   const newDate = dp.length === 3 ? `${dp[1]}/${dp[2]}` : dateRaw;
   const newAmount = newPrice * newQty + newFee;
-  p.trades[editingTradeIdx] = { ...oldTrade, type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate };
+  const newTInc = newType === '매수' ? segs.editTInc : undefined;
+  const si = state.trades.findIndex(x => x.portfolioId === editingTradePortId && x.date === oldTrade.date && x.type === oldTrade.type && x.price === oldTrade.price && x.qty === oldTrade.qty);
+  p.trades[editingTradeIdx] = { ...oldTrade, type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, tInc: newTInc };
+  if (si !== -1) state.trades[si] = { ...state.trades[si], type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, tInc: newTInc };
   recalcPortfolio(p);
   closeTradeEditOverlay();
   openDetail(editingTradePortId);
@@ -2011,7 +2026,10 @@ function recalcPortfolio(p) {
       const totalCost = avgPrice * qty + t.price * t.qty;
       qty += t.qty;
       avgPrice = qty > 0 ? totalCost / qty : 0;
-      tVal = tVal === 0 ? 1 : Math.round((tVal + 0.5) * 10) / 10;
+      const inc = t.tInc || '+0.5';
+      if (inc === '+1') tVal = Math.round((tVal + 1) * 10) / 10;
+      else if (inc === '+0.5') tVal = Math.round((tVal + 0.5) * 10) / 10;
+      // '+0': 변동 없음
     } else {
       qty = Math.max(0, qty - t.qty);
       if (qty === 0) avgPrice = 0;
