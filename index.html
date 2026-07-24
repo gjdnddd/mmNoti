@@ -1095,10 +1095,16 @@ function setSyncStatus(s) {
 // ══════════════════════════════════════════════
 //  CALC
 // ══════════════════════════════════════════════
+function calcRemaining(p) {
+  let cash = p.seed;
+  (p.trades || []).forEach(t => {
+    cash += t.type === '매수' ? -(t.amount || 0) : (t.amount || 0);
+  });
+  return cash;
+}
 function calcM(p) {
-  const invested = p.avg_price * p.hold_qty;
   const rem = p.D - p.t_value;
-  return rem > 0 ? (p.seed - invested) / rem : p.seed / p.D;
+  return rem > 0 ? calcRemaining(p) / rem : p.seed / p.D;
 }
 function calcStarRate(p) { return p.R - (2 * p.R / p.D) * p.t_value; }
 function calcStarP(p) { return p.avg_price > 0 ? p.avg_price * (1 + calcStarRate(p) / 100) : 0; }
