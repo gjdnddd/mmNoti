@@ -364,6 +364,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div class="guide-head">
         <span style="font-size:14px;font-weight:600;color:var(--text1)">무한매수법 가이드</span>
         <span class="badge badge-ver" id="d-ver2">Ver 4.0</span>
+        <span class="badge" id="d-phase" style="display:none;background:#f5c842;color:#000">후반전</span>
       </div>
       <div style="margin-bottom:12px">
         <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--red);color:#fff;margin-bottom:8px">매수</div>
@@ -1133,11 +1134,16 @@ function calcBuyP(p) { const sp = calcStarP(p); return sp > 0 ? parseFloat((sp -
 function calcSellP(p) { return p.avg_price > 0 ? parseFloat((p.avg_price * (1 + p.R / 100)).toFixed(2)) : 0; }
 function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
+function isSecondHalf(p) { return p.t_value >= p.D / 2; }
 function calcBuyQtys(p) {
   const M = calcM(p);
   const starP = calcBuyP(p);
   const avgP = p.avg_price;
   if (!starP || !avgP || M <= 0) return { xQty: 0, yQty: 0 };
+  if (isSecondHalf(p)) {
+    // 후반전(T≥D/2): 평단LOC 중단, 매수금 전액을 별지점LOC에만 투입 (무한매수법 규칙 §5-3)
+    return { xQty: 0, yQty: Math.floor(M / starP) };
+  }
   const maxAtAvg  = Math.floor(M / avgP);
   const maxAtStar = Math.floor(M / starP);
   const Y = Math.floor(maxAtStar / 2);
@@ -1335,7 +1341,8 @@ function openDetail(id) {
   document.getElementById('d-t').textContent = p.t_value;
   document.getElementById('d-r').textContent = p.R + '%';
   document.getElementById('d-star').textContent = sp.toFixed(2) + ' (' + sr + '%)';
-  document.getElementById('g-buy1').textContent = '$' + p.avg_price.toFixed(2) + ' × ' + avgQty(p) + '주';
+  document.getElementById('d-phase').style.display = isSecondHalf(p) ? 'inline-block' : 'none';
+  document.getElementById('g-buy1').textContent = isSecondHalf(p) ? '후반전 — 매수 중단' : ('$' + p.avg_price.toFixed(2) + ' × ' + avgQty(p) + '주');
   document.getElementById('g-buy2-pct').textContent = sr + '%';
   document.getElementById('g-buy2').textContent = '$' + bp.toFixed(2) + ' × ' + starQty(p) + '주';
   document.getElementById('g-sell1-pct').textContent = sr + '%';
