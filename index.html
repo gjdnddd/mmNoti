@@ -360,6 +360,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <div class="metric"><div class="m-label">Star 값</div><div class="m-val" id="d-star">-</div></div>
       </div>
     </div>
+    <div class="card">
+      <div class="card-title">소진모드 종가 기록 (최근 5거래일 평균 사용)</div>
+      <div id="close-history-list"></div>
+      <div class="grid2" style="margin-top:8px">
+        <input class="form-input" id="ch-date" type="date" />
+        <input class="form-input" id="ch-price" type="number" step="0.01" placeholder="종가" />
+      </div>
+      <button class="btn-secondary" style="margin-top:8px;width:100%" onclick="addCloseHistoryEntry()">추가 / 수정</button>
+    </div>
     <div class="guide-card">
       <div class="guide-head">
         <span style="font-size:14px;font-weight:600;color:var(--text1)">무한매수법 가이드</span>
@@ -462,7 +471,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div class="card-title">어느 무매에 입력할까요?</div>
       <div style="margin-bottom:12px">
         <label class="form-label">무매 선택</label>
-        <select class="select-input" id="target-port"></select>
+        <select class="select-input" id="target-port" onchange="onTargetPortChange()"></select>
       </div>
       <div style="margin-bottom:12px" id="t-inc-section">
         <label class="form-label">T값 증가</label>
@@ -479,6 +488,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
           <div class="seg-btn" onclick="setSeg(this,'sellType')">지정가매도 75%</div>
         </div>
       </div>
+      <div style="margin-bottom:12px;display:none;font-size:13px;color:var(--text3)" id="sell-type-hint">소진모드 매도 — T값 자동 계산됩니다</div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="ignoreInput()">무시</button>
         <button class="btn-primary" onclick="confirmInput()">입력하기</button>
@@ -720,7 +730,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
     <div class="sheet-title">수동 거래 입력</div>
     <div style="margin-bottom:14px">
       <label class="form-label">무매 선택</label>
-      <select class="select-input" id="manual-port"></select>
+      <select class="select-input" id="manual-port" onchange="onManualPortChange()"></select>
     </div>
     <div style="margin-bottom:14px">
       <label class="form-label">구분</label>
@@ -737,13 +747,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <div class="seg-btn" onclick="setSeg(this,'tIncManual')">+0</div>
       </div>
     </div>
-    <div style="margin-bottom:14px">
+    <div style="margin-bottom:14px" id="sell-type-section-manual">
       <label class="form-label">매도 종류</label>
       <div class="seg-ctrl" id="seg-sell-type-manual">
         <div class="seg-btn active" onclick="setSeg(this,'sellTypeManual')">쿼터매도 25%</div>
         <div class="seg-btn" onclick="setSeg(this,'sellTypeManual')">지정가매도 75%</div>
       </div>
     </div>
+    <div style="margin-bottom:14px;display:none;font-size:13px;color:var(--text3)" id="sell-type-hint-manual">소진모드 매도 — T값 자동 계산됩니다</div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">날짜</label><input class="form-input" id="manual-date" type="date" /></div>
       <div><label class="form-label">수량 (주)</label><input class="form-input" id="manual-qty" type="number" placeholder="0" /></div>
@@ -786,6 +797,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <div class="seg-btn" onclick="setSeg(this,'editSellType')">지정가매도 75%</div>
       </div>
     </div>
+    <div style="margin-bottom:14px;display:none;font-size:13px;color:var(--text3)" id="edit-sell-type-hint">소진모드 매도 — T값 자동 계산됩니다</div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">날짜</label><input class="form-input" id="edit-trade-date" type="date" /></div>
       <div><label class="form-label">수량 (주)</label><input class="form-input" id="edit-trade-qty" type="number" /></div>
@@ -1178,6 +1190,15 @@ function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
 function isSecondHalf(p) { return p.t_value >= p.D / 2; }
 function isReverseMode(p) { return p.mode === 'reverse'; }
+// 소진(리버스)모드에서는 매도 시 T값이 항상 자동 계산되므로 "쿼터매도/지정가매도" 선택이
+// 의미가 없어 숨기고 안내 문구로 대체.
+function toggleSellTypeUI(sectionId, hintId, portfolio) {
+  const sec = document.getElementById(sectionId);
+  const hint = document.getElementById(hintId);
+  const reverse = !!(portfolio && isReverseMode(portfolio));
+  if (sec) sec.style.display = reverse ? 'none' : 'block';
+  if (hint) hint.style.display = reverse ? 'block' : 'none';
+}
 // 리버스 별지점 = 직전 5거래일 종가 평균 (무한매수법 규칙 §11). 종가는 앱이 시세 조회 시점마다
 // 자동 기록한 근사치(그날 마지막 조회가)이며, 5일치가 안 쌓였으면 있는 만큼만 평균낸다.
 function calcReverseStarP(p) {
@@ -1424,8 +1445,65 @@ function openDetail(id) {
   document.getElementById('d-trades').innerHTML = trades.length
     ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; const tCell = t.type==='매수' ? (t.tInc||'+0.5') : (t.sellType ? (t.sellType.startsWith('쿼터매도')?'×0.75':'완전매도') : '-'); return `<tr><td>${t.date}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${tCell}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
     : '<tr><td colspan="5" style="color:var(--text3);padding:16px 0">거래 내역이 없어요</td></tr>';
+  renderCloseHistory(p);
   showScreen('detail');
   document.getElementById('screen-detail')._portId = id;
+}
+
+// ══════════════════════════════════════════════
+//  소진모드 종가 수동 입력/수정
+// ══════════════════════════════════════════════
+function renderCloseHistory(p) {
+  const el = document.getElementById('close-history-list');
+  if (!el) return;
+  const hist = (p.closeHistory || []).slice().sort((a,b) => a.date < b.date ? 1 : -1);
+  el.innerHTML = hist.length ? hist.map(h => `
+    <div class="guide-order">
+      <div class="order-left"><span class="o-desc">${h.date}</span></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input class="form-input" style="width:100px;padding:6px 8px" type="number" step="0.01" value="${h.price}" onchange="updateCloseHistoryPrice('${p.id}','${h.date}',this.value)" />
+        <button class="trade-act-btn trade-del-btn2" onclick="deleteCloseHistoryEntry('${p.id}','${h.date}')">×</button>
+      </div>
+    </div>`).join('') : '<div style="color:var(--text3);font-size:13px;padding:8px 0">기록된 종가가 없어요 — 시세 조회 시 자동 기록되거나, 아래에서 직접 추가할 수 있어요</div>';
+}
+
+async function updateCloseHistoryPrice(portId, date, val) {
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return;
+  const price = parseFloat(val);
+  if (!(price > 0)) { showToast('올바른 가격을 입력해주세요'); return; }
+  const h = (p.closeHistory || []).find(x => x.date === date);
+  if (h) h.price = price;
+  openDetail(portId);
+  await saveToGist();
+  showToast('✓ 종가 수정 완료');
+}
+
+async function deleteCloseHistoryEntry(portId, date) {
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return;
+  p.closeHistory = (p.closeHistory || []).filter(x => x.date !== date);
+  openDetail(portId);
+  await saveToGist();
+}
+
+async function addCloseHistoryEntry() {
+  const portId = document.getElementById('screen-detail')._portId;
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return;
+  const dateRaw = document.getElementById('ch-date').value;
+  const price = parseFloat(document.getElementById('ch-price').value);
+  if (!dateRaw || !(price > 0)) { showToast('날짜와 가격을 입력해주세요'); return; }
+  if (!p.closeHistory) p.closeHistory = [];
+  const idx = p.closeHistory.findIndex(x => x.date === dateRaw);
+  if (idx !== -1) p.closeHistory[idx].price = price;
+  else p.closeHistory.push({ date: dateRaw, price });
+  p.closeHistory.sort((a,b) => a.date < b.date ? -1 : 1);
+  if (p.closeHistory.length > 10) p.closeHistory = p.closeHistory.slice(-10);
+  document.getElementById('ch-price').value = '';
+  openDetail(portId);
+  await saveToGist();
+  showToast('✓ 종가 저장 완료');
 }
 
 // ══════════════════════════════════════════════
@@ -1477,6 +1555,12 @@ function parseKakao(text) {
   document.getElementById('target-port').innerHTML = matched.map(p => `<option value="${p.id}">${p.name} (${p.symbol})</option>`).join('');
   document.getElementById('confirm-section').style.display = 'block';
   document.getElementById('success-box').style.display = 'none';
+  toggleSellTypeUI('sell-type-section', 'sell-type-hint', matched[0]);
+}
+
+function onTargetPortChange() {
+  const p = state.portfolios.find(x => x.id === document.getElementById('target-port').value);
+  toggleSellTypeUI('sell-type-section', 'sell-type-hint', p);
 }
 
 function roundT(x) { return Math.round(x * 1000) / 1000; }
@@ -1566,6 +1650,12 @@ function openManualInput(type) {
   document.getElementById('manual-price').value = '';
   document.getElementById('manual-fee').value = '';
   document.getElementById('manual-overlay').classList.add('open');
+  onManualPortChange();
+}
+
+function onManualPortChange() {
+  const p = state.portfolios.find(x => x.id === document.getElementById('manual-port').value);
+  toggleSellTypeUI('sell-type-section-manual', 'sell-type-hint-manual', p);
 }
 
 // ══════════════════════════════════════════════
@@ -1678,6 +1768,7 @@ function resolvePendingInput(id) {
   if (!matched.length) { showToast(`운영 중인 ${t.symbol} 포트폴리오가 없어요`, 3000); return; }
   document.getElementById('target-port').innerHTML = matched.map(p=>`<option value="${p.id}">${p.name} (${p.symbol})</option>`).join('');
   document.getElementById('confirm-section').style.display = 'block';
+  toggleSellTypeUI('sell-type-section', 'sell-type-hint', matched[0]);
 }
 
 // ══════════════════════════════════════════════
@@ -2078,6 +2169,30 @@ async function deleteCycle(portId, start, end) {
 // ══════════════════════════════════════════════
 //  거래 내역 수정/삭제
 // ══════════════════════════════════════════════
+// 수정 대상 거래 "시점"의 모드를 재생으로 판정 (포트폴리오의 현재 모드와 다를 수 있음 —
+// 예: 지금은 정상모드로 복귀했어도 과거 특정 거래는 소진모드 중 발생했을 수 있음).
+function modeAtTradeIndex(p, idx) {
+  let tVal = 0, mode = 'normal';
+  for (let i = 0; i < idx; i++) {
+    const t = p.trades[i];
+    if (t.type === '매수') {
+      if (mode === 'reverse') {
+        tVal = roundT(tVal + (p.D - tVal) * 0.25);
+      } else {
+        const inc = t.tInc || '+0.5';
+        if (inc === '+1') tVal = roundT(tVal + 1);
+        else if (inc === '+0.5') tVal = roundT(tVal + 0.5);
+        if (tVal > p.D - 1) mode = 'reverse';
+      }
+    } else if (mode === 'reverse') {
+      tVal = roundT(tVal * (1 - 2 / p.D));
+    } else if ((t.sellType || '').startsWith('쿼터매도')) {
+      tVal = roundT(tVal * 0.75);
+    }
+  }
+  return mode;
+}
+
 function openTradeEdit(portId, tradeIdx) {
   editingTradePortId = portId;
   editingTradeIdx = tradeIdx;
@@ -2091,6 +2206,7 @@ function openTradeEdit(portId, tradeIdx) {
   setSegVal('editTInc', segs.editTInc);
   segs.editSellType = t.sellType || '쿼터매도 25%';
   setSegVal('editSellType', segs.editSellType);
+  toggleSellTypeUI('edit-sell-type-section', 'edit-sell-type-hint', { mode: modeAtTradeIndex(p, tradeIdx) });
   document.getElementById('edit-trade-date').value = toDateInput(t.date);
   document.getElementById('edit-trade-qty').value = t.qty;
   document.getElementById('edit-trade-price').value = t.price;
