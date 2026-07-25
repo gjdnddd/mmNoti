@@ -366,30 +366,51 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <span class="badge badge-ver" id="d-ver2">Ver 4.0</span>
         <span class="badge" id="d-phase" style="display:none;background:#f5c842;color:#000">후반전</span>
       </div>
-      <div style="margin-bottom:12px">
-        <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--red);color:#fff;margin-bottom:8px">매수</div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
-          <div class="o-val" id="g-buy1">-</div>
+      <div id="normal-guide">
+        <div style="margin-bottom:12px">
+          <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--red);color:#fff;margin-bottom:8px">매수</div>
+          <div class="guide-order">
+            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
+            <div class="o-val" id="g-buy1">-</div>
+          </div>
+          <div class="guide-order">
+            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-buy2-pct">-</span></div>
+            <div class="o-val" id="g-buy2">-</div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
+            <div id="d-ladder" class="ladder-list"></div>
+          </div>
         </div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-buy2-pct">-</span></div>
-          <div class="o-val" id="g-buy2">-</div>
-        </div>
-        <div style="margin-top:8px">
-          <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
-          <div id="d-ladder" class="ladder-list"></div>
+        <div>
+          <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--blue);color:#fff;margin-bottom:8px">매도</div>
+          <div class="guide-order">
+            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-sell1-pct">-</span></div>
+            <div class="o-val" id="g-sell1">-</div>
+          </div>
+          <div class="guide-order">
+            <div class="order-left"><span class="o-tag t-limit">지정가</span><span class="o-desc" id="g-sell2-pct">-</span></div>
+            <div class="o-val" id="g-sell2">-</div>
+          </div>
         </div>
       </div>
-      <div>
-        <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--blue);color:#fff;margin-bottom:8px">매도</div>
+      <div id="reverse-guide" style="display:none">
+        <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:#f5c842;color:#000;margin-bottom:8px">소진모드(리버스)</div>
         <div class="guide-order">
-          <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-sell1-pct">-</span></div>
-          <div class="o-val" id="g-sell1">-</div>
+          <div class="order-left"><span class="o-desc">별지점(리버스, 5일평균)</span></div>
+          <div class="o-val" id="rv-star">-</div>
         </div>
         <div class="guide-order">
-          <div class="order-left"><span class="o-tag t-limit">지정가</span><span class="o-desc" id="g-sell2-pct">-</span></div>
-          <div class="o-val" id="g-sell2">-</div>
+          <div class="order-left"><span class="o-desc" id="rv-sell-label">매도</span></div>
+          <div class="o-val" id="rv-sell">-</div>
+        </div>
+        <div class="guide-order">
+          <div class="order-left"><span class="o-desc">매수</span></div>
+          <div class="o-val" id="rv-buy">-</div>
+        </div>
+        <div class="guide-order">
+          <div class="order-left"><span class="o-desc">복귀조건 (종가 ≥)</span></div>
+          <div class="o-val" id="rv-exit">-</div>
         </div>
       </div>
       <div class="notice-box">
@@ -843,6 +864,9 @@ function migrateSeedFields() {
   if (!state.seed_history) state.seed_history = [];
   state.portfolios.forEach(p => {
     if (p.initial_seed === undefined) p.initial_seed = p.seed;
+    if (p.mode === undefined) p.mode = 'normal';
+    if (p.reverseDayCount === undefined) p.reverseDayCount = 0;
+    if (p.closeHistory === undefined) p.closeHistory = [];
   });
 }
 
@@ -1029,15 +1053,33 @@ async function fetchPrices() {
     return;
   }
   let updated = 0;
+  const today = new Date().toISOString().split('T')[0];
   for (const sym of symbols) {
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${state.finnhubKey}`);
       if (!res.ok) throw new Error(res.status);
       const data = await res.json();
-      if (data.c > 0) { state.prices[sym] = parseFloat(data.c.toFixed(2)); updated++; }
+      if (data.c > 0) {
+        const price = parseFloat(data.c.toFixed(2));
+        state.prices[sym] = price;
+        updated++;
+        // 소진(리버스) 모드 별지점용 종가 근사치 기록(그날 마지막 조회가) + 복귀조건 체크
+        state.portfolios.filter(p => !p.ended && p.symbol === sym).forEach(p => {
+          if (!p.closeHistory) p.closeHistory = [];
+          const idx = p.closeHistory.findIndex(h => h.date === today);
+          if (idx !== -1) p.closeHistory[idx].price = price;
+          else p.closeHistory.push({ date: today, price });
+          if (p.closeHistory.length > 10) p.closeHistory = p.closeHistory.slice(-10);
+          if (isReverseMode(p) && p.avg_price > 0 && price >= reverseExitPrice(p)) {
+            p.mode = 'normal';
+            p.reverseDayCount = 0;
+          }
+        });
+      }
     } catch(e) {}
   }
   saveLocal();
+  if (updated > 0) await saveToGist();
   const now = new Date().toLocaleTimeString('ko-KR');
   if (info) {
     if (updated > 0) info.innerHTML = `<span class="sync-dot dot-ok"></span>갱신됨 · ${now}`;
@@ -1135,6 +1177,17 @@ function calcSellP(p) { return p.avg_price > 0 ? parseFloat((p.avg_price * (1 + 
 function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
 function isSecondHalf(p) { return p.t_value >= p.D / 2; }
+function isReverseMode(p) { return p.mode === 'reverse'; }
+// 리버스 별지점 = 직전 5거래일 종가 평균 (무한매수법 규칙 §11). 종가는 앱이 시세 조회 시점마다
+// 자동 기록한 근사치(그날 마지막 조회가)이며, 5일치가 안 쌓였으면 있는 만큼만 평균낸다.
+function calcReverseStarP(p) {
+  const hist = (p.closeHistory || []).slice(-5);
+  if (!hist.length) return p.avg_price;
+  return hist.reduce((s, h) => s + h.price, 0) / hist.length;
+}
+function reverseSellQty(p) { return Math.floor(p.hold_qty / (p.D / 2)); }
+function reverseBuyAmount(p) { return calcRemaining(p) / 4; }
+function reverseExitPrice(p) { return p.avg_price * (1 - p.R / 100); }
 function calcBuyQtys(p) {
   const M = calcM(p);
   const starP = calcBuyP(p);
@@ -1341,18 +1394,32 @@ function openDetail(id) {
   document.getElementById('d-t').textContent = p.t_value;
   document.getElementById('d-r').textContent = p.R + '%';
   document.getElementById('d-star').textContent = sp.toFixed(2) + ' (' + sr + '%)';
-  document.getElementById('d-phase').style.display = isSecondHalf(p) ? 'inline-block' : 'none';
-  document.getElementById('g-buy1').textContent = isSecondHalf(p) ? '후반전 — 매수 중단' : ('$' + p.avg_price.toFixed(2) + ' × ' + avgQty(p) + '주');
-  document.getElementById('g-buy2-pct').textContent = sr + '%';
-  document.getElementById('g-buy2').textContent = '$' + bp.toFixed(2) + ' × ' + starQty(p) + '주';
-  document.getElementById('g-sell1-pct').textContent = sr + '%';
-  document.getElementById('g-sell1').textContent = '$' + sp.toFixed(2) + ' × ' + sell25qty(p) + '주';
-  document.getElementById('g-sell2-pct').textContent = p.R + '%';
-  document.getElementById('g-sell2').textContent = '$' + calcSellP(p).toFixed(2) + ' × ' + sell75qty(p) + '주';
-  const ladder = ladderPrices(p);
-  document.getElementById('d-ladder').innerHTML = ladder.map(l =>
-    `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`
-  ).join('');
+  const reverse = isReverseMode(p);
+  document.getElementById('d-phase').style.display = (isSecondHalf(p) || reverse) ? 'inline-block' : 'none';
+  document.getElementById('d-phase').textContent = reverse ? '소진모드' : '후반전';
+  document.getElementById('normal-guide').style.display = reverse ? 'none' : 'block';
+  document.getElementById('reverse-guide').style.display = reverse ? 'block' : 'none';
+  if (reverse) {
+    const rvStar = calcReverseStarP(p);
+    const histLen = (p.closeHistory || []).length;
+    document.getElementById('rv-star').textContent = '$' + rvStar.toFixed(2) + (histLen < 5 ? ` (${histLen}일치만 반영)` : '');
+    document.getElementById('rv-sell-label').textContent = p.reverseDayCount === 0 ? '1일차 MOC 매도 (무조건)' : '별지점 이상시 매도';
+    document.getElementById('rv-sell').textContent = reverseSellQty(p) + '주';
+    document.getElementById('rv-buy').textContent = p.reverseDayCount === 0 ? '1일차는 매수 없음' : ('별지점 아래 $' + reverseBuyAmount(p).toFixed(2) + '어치');
+    document.getElementById('rv-exit').textContent = '$' + reverseExitPrice(p).toFixed(2);
+  } else {
+    document.getElementById('g-buy1').textContent = isSecondHalf(p) ? '후반전 — 매수 중단' : ('$' + p.avg_price.toFixed(2) + ' × ' + avgQty(p) + '주');
+    document.getElementById('g-buy2-pct').textContent = sr + '%';
+    document.getElementById('g-buy2').textContent = '$' + bp.toFixed(2) + ' × ' + starQty(p) + '주';
+    document.getElementById('g-sell1-pct').textContent = sr + '%';
+    document.getElementById('g-sell1').textContent = '$' + sp.toFixed(2) + ' × ' + sell25qty(p) + '주';
+    document.getElementById('g-sell2-pct').textContent = p.R + '%';
+    document.getElementById('g-sell2').textContent = '$' + calcSellP(p).toFixed(2) + ' × ' + sell75qty(p) + '주';
+    const ladder = ladderPrices(p);
+    document.getElementById('d-ladder').innerHTML = ladder.map(l =>
+      `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`
+    ).join('');
+  }
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
     ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; const tCell = t.type==='매수' ? (t.tInc||'+0.5') : (t.sellType ? (t.sellType.startsWith('쿼터매도')?'×0.75':'완전매도') : '-'); return `<tr><td>${t.date}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${tCell}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
@@ -1413,10 +1480,33 @@ function parseKakao(text) {
 }
 
 function roundT(x) { return Math.round(x * 1000) / 1000; }
-// 쿼터매도(25%) 체결 시 T = 직전T × 0.75 (무한매수법 규칙 §2). 지정가매도(75%, 완전매도)는
+// 소진(리버스)모드 진입조건: T > D-1 (무한매수법 규칙 §8). 매수로만 T가 오르므로 매수 후에만 체크.
+function checkReverseEntry(p) {
+  if (p.mode !== 'reverse' && p.t_value > p.D - 1) {
+    p.mode = 'reverse';
+    p.reverseDayCount = 0;
+  }
+}
+// 일반모드: 1회(+1)/절반(+0.5) 매수 체결. 리버스모드: 직전T + (D-직전T)×0.25 (규칙 §12)
+function applyBuyTInc(p, tInc) {
+  if (isReverseMode(p)) {
+    p.t_value = roundT(p.t_value + (p.D - p.t_value) * 0.25);
+  } else {
+    if (tInc === '+1') p.t_value = roundT(p.t_value + 1);
+    else if (tInc === '+0.5') p.t_value = roundT(p.t_value + 0.5);
+    checkReverseEntry(p);
+  }
+}
+// 일반모드: 쿼터매도(25%) 체결 시 T = 직전T × 0.75 (규칙 §2). 지정가매도(75%, 완전매도)는
 // 보유수량이 0이 되며 사이클 종료 로직이 T를 리셋하므로 여기서는 별도 처리하지 않음.
+// 리버스모드: 매도 체결 시 T = 직전T × (1-2/D) (규칙 §12), 리버스 경과일 +1.
 function applySellTInc(p, sellType) {
-  if ((sellType || '').startsWith('쿼터매도')) p.t_value = roundT(p.t_value * 0.75);
+  if (isReverseMode(p)) {
+    p.t_value = roundT(p.t_value * (1 - 2 / p.D));
+    p.reverseDayCount = (p.reverseDayCount || 0) + 1;
+  } else if ((sellType || '').startsWith('쿼터매도')) {
+    p.t_value = roundT(p.t_value * 0.75);
+  }
 }
 
 async function confirmInput() {
@@ -1435,12 +1525,7 @@ async function confirmInput() {
     const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
     p.hold_qty += t.qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    const tInc = segs.tInc;
-    if (tInc === '+1') {
-      p.t_value = roundT(p.t_value + 1);
-    } else if (tInc === '+0.5') {
-      p.t_value = roundT(p.t_value + 0.5);
-    } // '+0': 변동 없음
+    applyBuyTInc(p, segs.tInc);
     if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - t.qty);
@@ -1524,10 +1609,10 @@ async function endCycle() {
   const tsel = document.getElementById('total-seed-input');
   if (tsel) tsel.value = state.totalSeed;
   if (endOnly) {
-    p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true;
+    p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.trades = []; p.ended = true; p.mode = 'normal'; p.reverseDayCount = 0;
   } else {
     if (profit > 0) p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
-    p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = [];
+    p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = []; p.mode = 'normal'; p.reverseDayCount = 0;
   }
   closeEndOverlay();
   renderAll();
@@ -1850,7 +1935,7 @@ async function savePortfolio() {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
     state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: initialSeedVal };
   } else {
-    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, ...data });
+    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, mode:'normal', reverseDayCount:0, closeHistory:[], ...data });
   }
   closeAddSheet();
   renderAll();
@@ -1950,12 +2035,7 @@ async function confirmManualInput() {
     const totalCost = p.avg_price * p.hold_qty + price * qty;
     p.hold_qty += qty;
     p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    const tIncM = segs.tIncManual;
-    if (tIncM === '+1') {
-      p.t_value = roundT(p.t_value + 1);
-    } else if (tIncM === '+0.5') {
-      p.t_value = roundT(p.t_value + 0.5);
-    } // '+0': 변동 없음
+    applyBuyTInc(p, segs.tIncManual);
   } else {
     p.hold_qty = Math.max(0, p.hold_qty - qty);
     applySellTInc(p, sellTypeVal);
@@ -2068,26 +2148,42 @@ async function deleteTrade(portId, tradeIdx) {
   showToast('거래 내역 삭제 완료');
 }
 
+// 거래 내역을 처음부터 재생하며 보유수량·평단·T값·소진(리버스)모드 상태를 재계산.
+// 주의: 리버스모드 이탈(가격 회복)은 시점별 종가 이력에 의존하는 판정이라 재생만으로는
+// 재현할 수 없음 — 과거 거래를 수정/삭제하면 이탈 이력이 사라져 모드가 어긋날 수 있는
+// 드문 엣지케이스가 있음.
 function recalcPortfolio(p) {
-  let qty = 0, avgPrice = 0, tVal = 0;
+  let qty = 0, avgPrice = 0, tVal = 0, mode = 'normal', reverseDayCount = 0;
   (p.trades||[]).forEach(t => {
     if (t.type === '매수') {
       const totalCost = avgPrice * qty + t.price * t.qty;
       qty += t.qty;
       avgPrice = qty > 0 ? totalCost / qty : 0;
-      const inc = t.tInc || '+0.5';
-      if (inc === '+1') tVal = roundT(tVal + 1);
-      else if (inc === '+0.5') tVal = roundT(tVal + 0.5);
-      // '+0': 변동 없음
+      if (mode === 'reverse') {
+        tVal = roundT(tVal + (p.D - tVal) * 0.25);
+      } else {
+        const inc = t.tInc || '+0.5';
+        if (inc === '+1') tVal = roundT(tVal + 1);
+        else if (inc === '+0.5') tVal = roundT(tVal + 0.5);
+        // '+0': 변동 없음
+        if (tVal > p.D - 1) { mode = 'reverse'; reverseDayCount = 0; }
+      }
     } else {
       qty = Math.max(0, qty - t.qty);
       if (qty === 0) avgPrice = 0;
-      if ((t.sellType || '').startsWith('쿼터매도')) tVal = roundT(tVal * 0.75);
+      if (mode === 'reverse') {
+        tVal = roundT(tVal * (1 - 2 / p.D));
+        reverseDayCount++;
+      } else if ((t.sellType || '').startsWith('쿼터매도')) {
+        tVal = roundT(tVal * 0.75);
+      }
     }
   });
   p.hold_qty = qty;
   p.avg_price = avgPrice;
   p.t_value = tVal;
+  p.mode = mode;
+  p.reverseDayCount = reverseDayCount;
 }
 
 // ══════════════════════════════════════════════
