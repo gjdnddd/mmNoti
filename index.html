@@ -956,7 +956,10 @@ function parseMeritzItem(item) {
   const amount = parseFloat((item['체결금액'] || '0').replace(/USD\s*/i, '').replace(/,/g, ''));
   const type   = (item['매매구분'] || '').includes('매도') ? '매도' : '매수';
   const date   = item['체결일자'] || '';
-  const id     = 'meritz_' + (item['timestamp'] || Date.now());
+  // dedupKey는 알림 내용 기반이라 같은 체결이 재파싱돼도 항상 동일 — timestamp(처리 시각)는
+  // 재파싱마다 달라져서 id로 쓰면 같은 거래가 중복으로 쌓인다. 구버전 항목엔 dedupKey가
+  // 없으므로 timestamp로 폴백.
+  const id = 'meritz_' + (item['dedupKey'] || item['timestamp'] || Date.now());
   return { id, symbol, type, price, qty, amount, date, source: 'meritz' };
 }
 
@@ -976,7 +979,12 @@ async function pollMeritz() {
       const parsed = JSON.parse(content);
       items = Array.isArray(parsed) ? parsed : [parsed];
     } catch(e) { return; }
-    const existingIds = new Set(state.pending.map(p => p.id));
+    // pending뿐 아니라 이미 확인 완료해 pending에서 빠진 거래(state.trades)도 봐야
+    // 재전송된 알림이 "이미 처리한 거래"로 다시 안 잡힌다.
+    const existingIds = new Set([
+      ...state.pending.map(p => p.id),
+      ...state.trades.map(t => t.id).filter(Boolean)
+    ]);
     const newItems = items
       .map(parseMeritzItem)
       .filter(t => t.symbol && !existingIds.has(t.id));
