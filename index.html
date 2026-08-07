@@ -292,6 +292,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       <div style="display:flex;gap:8px">
         <button class="icon-btn" onclick="fetchPrices()">📈 시세</button>
         <button class="icon-btn" onclick="syncGist()">🔄 동기화</button>
+        <button class="icon-btn" onclick="takeOrderSnapshot()" title="오늘 주문 세팅을 저장해서 체결 자동입력 대조에 사용">📸 스냅샷</button>
       </div>
     </div>
     <div class="summary-card">
@@ -879,6 +880,7 @@ function migrateSeedFields() {
     if (p.mode === undefined) p.mode = 'normal';
     if (p.reverseDayCount === undefined) p.reverseDayCount = 0;
     if (p.closeHistory === undefined) p.closeHistory = [];
+    if (p.orderSnapshots === undefined) p.orderSnapshots = [];
   });
 }
 
@@ -989,16 +991,43 @@ async function pollMeritz() {
       .map(parseMeritzItem)
       .filter(t => t.symbol && !existingIds.has(t.id));
     if (!newItems.length) return;
-    state.pending = [...state.pending, ...newItems];
-    renderPending();
-    showToast(`${newItems.length}건 신규 체결 감지`);
+
+    // 오늘 찍어둔 주문 스냅샷과 수량을 대조해 확실한 건만 자동입력, 애매하면 대기 목록으로.
+    const autoApplied = [];
+    const stillPending = [];
+    newItems.forEach(item => {
+      const matched = state.portfolios.filter(p => !p.ended && p.symbol === item.symbol);
+      if (matched.length !== 1) { stillPending.push(item); return; }
+      const p = matched[0];
+      const m = matchTradeToSnapshot(p, item);
+      if (!m) { stillPending.push(item); return; }
+      if (item.type === '매도' && Math.max(0, p.hold_qty - item.qty) === 0) {
+        stillPending.push(item); return; // 사이클 종료는 수동 확인 필요
+      }
+      const tInc = item.type === '매수' ? m.tInc : undefined;
+      const sellType = item.type === '매도' && !m.reverse ? m.sellType : undefined;
+      applyTradeToPortfolio(p, { ...item, tInc, sellType });
+      autoApplied.push({ item, portfolio: p.name });
+    });
+
+    if (stillPending.length) {
+      state.pending = [...state.pending, ...stillPending];
+      renderPending();
+    }
+    if (autoApplied.length) renderAll();
     saveLocal();
     await saveToGist();
+
+    const msgParts = [];
+    if (autoApplied.length) msgParts.push(`자동입력 ${autoApplied.length}건 (${autoApplied.map(a => `${a.portfolio} ${a.item.type} ${a.item.qty}주`).join(', ')})`);
+    if (stillPending.length) msgParts.push(`확인 필요 ${stillPending.length}건`);
+    showToast('✓ ' + msgParts.join(' · '), 4500);
+
     if (Notification.permission === 'granted') {
-      new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+      new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission().then(p => {
-        if (p === 'granted') new Notification('무한매수 체결 감지', { body: `${newItems.length}건 신규 체결 — 간편입력 탭 확인`, icon: '' });
+        if (p === 'granted') new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
       });
     }
     // 읽은 항목 Gist에서 초기화
@@ -1217,6 +1246,62 @@ function calcReverseStarP(p) {
 function reverseSellQty(p) { return Math.floor(p.hold_qty / (p.D / 2)); }
 function reverseBuyAmount(p) { return calcRemaining(p) / 4; }
 function reverseExitPrice(p) { return p.avg_price * (1 - p.R / 100); }
+
+// ══════════════════════════════════════════════
+//  주문 스냅샷 (자동입력 대조용)
+// ══════════════════════════════════════════════
+// 오늘 실제로 걸어둔 주문의 예상 체결수량을 저장해뒀다가, 나중에 들어오는 체결 알림의
+// 수량과 대조해서 T값/매도종류를 자동 판정한다 (재계산이 아니라 실제 주문 스냅샷과 대조하는
+// 방식이라 며칠 밀린 체결이나 T값 변동 중간에 들어오는 체결도 안전하게 처리 가능).
+function buildOrderSnapshot(p) {
+  const reverse = isReverseMode(p);
+  return {
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now(),
+    mode: p.mode,
+    avgQty: reverse ? 0 : avgQty(p),
+    starQty: reverse ? 0 : starQty(p),
+    sell25qty: sell25qty(p),
+    sell75qty: sell75qty(p),
+    reverseSellQty: reverse ? reverseSellQty(p) : 0
+  };
+}
+
+async function takeOrderSnapshot() {
+  const active = state.portfolios.filter(p => !p.ended);
+  if (!active.length) { showToast('진행 중인 포트폴리오가 없어요'); return; }
+  active.forEach(p => {
+    if (!p.orderSnapshots) p.orderSnapshots = [];
+    p.orderSnapshots.push(buildOrderSnapshot(p));
+    if (p.orderSnapshots.length > 10) p.orderSnapshots = p.orderSnapshots.slice(-10);
+  });
+  saveLocal();
+  await saveToGist();
+  showToast(`✓ 오늘 주문 스냅샷 저장 (${active.length}개 포트폴리오)`);
+}
+
+// 새 체결(item)을 포트폴리오 p의 스냅샷 이력(최신순)과 대조해 tInc/sellType을 판정.
+// 확실히 맞는 경우에만 값을 반환하고, 애매하면 null(자동입력 보류 → 기존처럼 대기 목록행).
+function matchTradeToSnapshot(p, item) {
+  const snaps = (p.orderSnapshots || []).slice().reverse();
+  for (const s of snaps) {
+    if (item.type === '매수') {
+      if (s.mode === 'reverse') continue; // 리버스 매수는 잔금/4라 수량으로 특정 어려움 → 보류
+      const matchAvg = s.avgQty > 0 && item.qty === s.avgQty;
+      const matchStar = s.starQty > 0 && item.qty === s.starQty;
+      if (matchAvg || matchStar) return { tInc: '+0.5' };
+      if (item.qty === 1 && s.avgQty >= 2 && s.starQty >= 2) return { tInc: '+0' };
+    } else {
+      if (s.mode === 'reverse') {
+        if (s.reverseSellQty > 0 && item.qty === s.reverseSellQty) return { reverse: true };
+        continue;
+      }
+      if (s.sell25qty > 0 && item.qty === s.sell25qty) return { sellType: '쿼터매도 25%' };
+      if (s.sell75qty > 0 && item.qty === s.sell75qty) return { sellType: '지정가매도 75%' };
+    }
+  }
+  return null;
+}
 function calcBuyQtys(p) {
   const M = calcM(p);
   const starP = calcBuyP(p);
@@ -1601,6 +1686,27 @@ function applySellTInc(p, sellType) {
   }
 }
 
+// 거래 1건을 포트폴리오에 실제로 반영 (보유수량/평단/T값/사이클종료 판정).
+// confirmInput/confirmManualInput/자동입력(pollMeritz) 세 경로가 공유한다.
+// t: { date, type, price, qty, amount, fee, tInc, sellType }
+function applyTradeToPortfolio(p, t) {
+  if (!p.trades) p.trades = [];
+  const trade = { date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
+  p.trades.push(trade);
+  state.trades.push({ ...trade, portfolio:p.name, portfolioId:p.id, symbol:p.symbol });
+  if (t.type === '매수') {
+    const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
+    p.hold_qty += t.qty;
+    p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
+    applyBuyTInc(p, t.tInc);
+    if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
+  } else {
+    p.hold_qty = Math.max(0, p.hold_qty - t.qty);
+    applySellTInc(p, t.sellType);
+    if (p.hold_qty === 0) { checkCycleEnd(p.id); }
+  }
+}
+
 async function confirmInput() {
   if (!parsedTrade) return;
   const pid = document.getElementById('target-port').value;
@@ -1608,22 +1714,9 @@ async function confirmInput() {
   if (!p) return;
   if (p.symbol !== parsedTrade.symbol) { showToast(`종목 불일치: ${p.symbol} 포트에 ${parsedTrade.symbol} 입력 불가`); return; }
   const t = parsedTrade;
-  if (!p.trades) p.trades = [];
   const tIncVal = t.type === '매수' ? segs.tInc : undefined;
   const sellTypeVal = t.type === '매도' ? segs.sellType : undefined;
-  p.trades.push({ date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, tInc:tIncVal, sellType:sellTypeVal });
-  state.trades.push({ ...t, portfolio:p.name, portfolioId:p.id, tInc:tIncVal, sellType:sellTypeVal });
-  if (t.type === '매수') {
-    const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
-    p.hold_qty += t.qty;
-    p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    applyBuyTInc(p, segs.tInc);
-    if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
-  } else {
-    p.hold_qty = Math.max(0, p.hold_qty - t.qty);
-    applySellTInc(p, sellTypeVal);
-    if (p.hold_qty === 0) { checkCycleEnd(p.id); }
-  }
+  applyTradeToPortfolio(p, { ...t, tInc: tIncVal, sellType: sellTypeVal });
   document.getElementById('kakao-text').value = '';
   document.getElementById('parse-result').style.display = 'none';
   document.getElementById('confirm-section').style.display = 'none';
@@ -2034,7 +2127,7 @@ async function savePortfolio() {
     const idx = state.portfolios.findIndex(p => p.id === editingId);
     state.portfolios[idx] = { ...state.portfolios[idx], ...data, initial_seed: initialSeedVal };
   } else {
-    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, mode:'normal', reverseDayCount:0, closeHistory:[], ...data });
+    state.portfolios.push({ id: Date.now().toString(), trades:[], cycles:[], initial_seed: initialSeedVal, mode:'normal', reverseDayCount:0, closeHistory:[], orderSnapshots:[], ...data });
   }
   closeAddSheet();
   renderAll();
@@ -2126,20 +2219,9 @@ async function confirmManualInput() {
   const amount = price * qty + fee;
   const tIncVal = type === '매수' ? segs.tIncManual : undefined;
   const sellTypeVal = type === '매도' ? segs.sellTypeManual : undefined;
-  const trade = { date, type, price, qty, amount, fee, tInc: tIncVal, sellType: sellTypeVal };
-  if (!p.trades) p.trades = [];
-  p.trades.push(trade);
-  state.trades.push({ ...trade, portfolio: p.name, portfolioId: p.id, symbol: p.symbol });
-  if (type === '매수') {
-    const totalCost = p.avg_price * p.hold_qty + price * qty;
-    p.hold_qty += qty;
-    p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    applyBuyTInc(p, segs.tIncManual);
-  } else {
-    p.hold_qty = Math.max(0, p.hold_qty - qty);
-    applySellTInc(p, sellTypeVal);
-    if (p.hold_qty === 0) { closeManualOverlay(); checkCycleEnd(pid); return; }
-  }
+  const willZeroOut = type === '매도' && Math.max(0, p.hold_qty - qty) === 0;
+  applyTradeToPortfolio(p, { date, type, price, qty, amount, fee, tInc: tIncVal, sellType: sellTypeVal });
+  if (willZeroOut) { closeManualOverlay(); return; } // checkCycleEnd가 이미 종료 오버레이를 열어둠
   closeManualOverlay();
   renderAll();
   await saveToGist();
