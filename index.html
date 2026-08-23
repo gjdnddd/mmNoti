@@ -1700,7 +1700,10 @@ function applySellTInc(p, sellType) {
 // t: { date, type, price, qty, amount, fee, tInc, sellType }
 function applyTradeToPortfolio(p, t) {
   if (!p.trades) p.trades = [];
-  const trade = { date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
+  // id는 파서(meritz) 경로에서만 존재(dedupKey 기반) — 완전 수동입력은 undefined로 남는다.
+  // pollMeritz()의 existingIds가 state.trades에서 id를 찾으므로, 여기서 빠뜨리면
+  // 자동입력된 거래를 "이미 처리했다"고 기억 못 해 같은 체결이 폴링마다 재적용된다.
+  const trade = { id:t.id, date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
   p.trades.push(trade);
   state.trades.push({ ...trade, portfolio:p.name, portfolioId:p.id, symbol:p.symbol });
   if (t.type === '매수') {
