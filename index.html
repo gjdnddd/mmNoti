@@ -962,7 +962,14 @@ function parseMeritzItem(item) {
   // 재파싱마다 달라져서 id로 쓰면 같은 거래가 중복으로 쌓인다. 구버전 항목엔 dedupKey가
   // 없으므로 timestamp로 폴백.
   const id = 'meritz_' + (item['dedupKey'] || item['timestamp'] || Date.now());
-  return { id, symbol, type, price, qty, amount, date, source: 'meritz' };
+  // dedupKey 마지막 필드가 postTime(알림이 폰에 게시된 시각, ms) — 실제 체결 순간에 가장 가까운
+  // 값. LOC 매매처럼 근접 체결이 많을 때 화면에서 구분하도록 시:분:초.밀리초까지 표시한다.
+  const dk = item['dedupKey'] || '';
+  const postTimeMs = parseInt(dk.split('|').pop()) || parseInt(item['timestamp']) || 0;
+  const time = postTimeMs
+    ? new Date(postTimeMs).toLocaleTimeString('ko-KR', { hour12: false }) + '.' + String(postTimeMs % 1000).padStart(3, '0')
+    : '';
+  return { id, symbol, type, price, qty, amount, date, time, source: 'meritz' };
 }
 
 async function pollMeritz() {
@@ -1545,7 +1552,7 @@ function openDetail(id) {
   }
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
-    ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; const tCell = t.type==='매수' ? (t.tInc||'+0.5') : (t.sellType ? (t.sellType.startsWith('쿼터매도')?'×0.75':'완전매도') : '-'); return `<tr><td>${t.date}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${tCell}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
+    ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; const tCell = t.type==='매수' ? (t.tInc||'+0.5') : (t.sellType ? (t.sellType.startsWith('쿼터매도')?'×0.75':'완전매도') : '-'); return `<tr><td>${t.date}${t.time ? '<br><span style="font-size:10px;color:var(--text3)">' + t.time + '</span>' : ''}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${tCell}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
     : '<tr><td colspan="5" style="color:var(--text3);padding:16px 0">거래 내역이 없어요</td></tr>';
   renderCloseHistory(p);
   showScreen('detail');
@@ -1703,7 +1710,7 @@ function applyTradeToPortfolio(p, t) {
   // id는 파서(meritz) 경로에서만 존재(dedupKey 기반) — 완전 수동입력은 undefined로 남는다.
   // pollMeritz()의 existingIds가 state.trades에서 id를 찾으므로, 여기서 빠뜨리면
   // 자동입력된 거래를 "이미 처리했다"고 기억 못 해 같은 체결이 폴링마다 재적용된다.
-  const trade = { id:t.id, date:t.date, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
+  const trade = { id:t.id, date:t.date, time:t.time, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
   p.trades.push(trade);
   state.trades.push({ ...trade, portfolio:p.name, portfolioId:p.id, symbol:p.symbol });
   if (t.type === '매수') {
@@ -1839,7 +1846,7 @@ function renderPending() {
           <span class="badge ${t.type==='매수'?'badge-buy':'badge-sell'}">${t.type}</span>
           ${t.source==='meritz'?'<span class="badge badge-wait" style="font-size:10px">자동감지</span>':''}
         </div>
-        <span style="font-size:12px;color:var(--text3)">${t.date}</span>
+        <span style="font-size:12px;color:var(--text3)">${t.date}${t.time ? ' ' + t.time : ''}</span>
       </div>
       <div class="grid3" style="margin-bottom:12px">
         <div class="metric"><div class="m-label">체결단가</div><div class="m-val">$${t.price.toFixed(2)}</div></div>
