@@ -1018,24 +1018,33 @@ async function pollMeritz() {
     saveLocal();
     await saveToGist();
 
-    const msgParts = [];
-    if (autoApplied.length) msgParts.push(`자동입력 ${autoApplied.length}건 (${autoApplied.map(a => `${a.portfolio} ${a.item.type} ${a.item.qty}주`).join(', ')})`);
-    if (stillPending.length) msgParts.push(`확인 필요 ${stillPending.length}건`);
-    showToast('✓ ' + msgParts.join(' · '), 4500);
-
-    if (Notification.permission === 'granted') {
-      new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(p => {
-        if (p === 'granted') new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
-      });
-    }
-    // 읽은 항목 Gist에서 초기화
+    // 읽은 항목 Gist에서 초기화 — pending/trades 반영이 끝나면 곧바로 실행한다.
+    // 예전엔 이 아래 토스트/알림 코드보다 뒤에 있어서, 알림 권한 처리 중 예외가 나면
+    // (예: Notification 생성자를 안 지원하는 브라우저) 여기까지 도달하지 못하고
+    // catch(e){}에 조용히 삼켜졌다 — pending엔 반영됐는데 원본 큐는 안 비워져서
+    // 다음 폴링마다 같은 항목이 다시 "새 항목"으로 잡히는 원인이었다.
     await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
       headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ files: { 'meritz_trades.json': { content: '[]' } } })
     });
+
+    const msgParts = [];
+    if (autoApplied.length) msgParts.push(`자동입력 ${autoApplied.length}건 (${autoApplied.map(a => `${a.portfolio} ${a.item.type} ${a.item.qty}주`).join(', ')})`);
+    if (stillPending.length) msgParts.push(`확인 필요 ${stillPending.length}건`);
+    showToast('✓ ' + msgParts.join(' · '), 4500);
+
+    // 알림 표시는 부가 기능이라 실패해도 위의 핵심 처리(pending 반영 + 큐 비우기)에
+    // 영향을 주면 안 되므로 별도 try/catch로 격리한다.
+    try {
+      if (Notification.permission === 'granted') {
+        new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => {
+          if (p === 'granted') new Notification('무한매수 체결 감지', { body: msgParts.join(' · '), icon: '' });
+        });
+      }
+    } catch (e) {}
   } catch(e) {}
 }
 
