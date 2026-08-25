@@ -1121,7 +1121,7 @@ async function fetchPrices() {
     return;
   }
   let updated = 0;
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   for (const sym of symbols) {
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${state.finnhubKey}`);
@@ -1205,7 +1205,7 @@ function resetSeedPeriod() {
   if (!init) { showToast('최초 시드를 먼저 입력해주세요'); return; }
   const profit = parseFloat((cur - init).toFixed(2));
   const yPct   = parseFloat((profit / init * 100).toFixed(2));
-  const date   = new Date().toISOString().split('T')[0];
+  const date   = localDateStr();
   if (!state.seed_history) state.seed_history = [];
   state.seed_history.unshift({ date, initial_seed: init, final_seed: cur, profit, yield_pct: yPct });
   state.initial_totalSeed = cur;
@@ -1276,7 +1276,7 @@ function buildOrderSnapshot(p) {
   const reverse = isReverseMode(p);
   const secondHalf = !reverse && isSecondHalf(p);
   return {
-    date: new Date().toISOString().split('T')[0],
+    date: localDateStr(),
     timestamp: Date.now(),
     mode: p.mode,
     secondHalf,
@@ -1295,8 +1295,18 @@ function buildOrderSnapshot(p) {
   };
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function yesterdayStr() { return new Date(Date.now() - 86400000).toISOString().split('T')[0]; }
+// UTC가 아니라 사용자의 로컬(한국) 날짜를 문자열로 반환. new Date().toISOString()은
+// UTC 기준이라, 한국시간 자정~오전 9시 사이엔 아직 "어제" 날짜를 돌려줘서
+// 스냅샷/종가기록 날짜가 실제 날짜보다 하루 밀리는 버그가 있었다(2026-08-26 실사고).
+function localDateStr(d) {
+  d = d || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function todayStr() { return localDateStr(); }
+function yesterdayStr() { return localDateStr(new Date(Date.now() - 86400000)); }
 
 function hasTodaySnapshot() {
   const today = todayStr();
@@ -1817,7 +1827,7 @@ function openManualInput(type) {
   document.getElementById('manual-port').innerHTML = state.portfolios
     .filter(p => !p.ended)
     .map(p => `<option value="${p.id}" ${p.id===pid?'selected':''}>${p.name} (${p.symbol})</option>`).join('');
-  document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('manual-date').value = localDateStr();
   document.getElementById('manual-qty').value = '';
   document.getElementById('manual-price').value = '';
   document.getElementById('manual-fee').value = '';
@@ -1863,7 +1873,7 @@ async function endCycle() {
   if (!p) return;
   const profit = parseFloat(document.getElementById('end-profit').value) || 0;
   const endOnly = segs.seed === '종료만';
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   if (!p.cycles) p.cycles = [];
   p.cycles.push({ no: p.cycles.length+1, start: p.start_date, end: today, seed: p.seed, profit, trades_count:(p.trades||[]).length, trades:[...(p.trades||[])] });
   p.acc_profit += profit;
@@ -2023,7 +2033,7 @@ function renderCycle() {
   document.getElementById('cy-yield').textContent = avgYield.toFixed(2) + '%';
   const ongoingPS = (cycleFilter === 'all' ? state.portfolios : state.portfolios.filter(p => p.id === cycleFilter)).filter(p => !p.ended);
   document.getElementById('ongoing-list').innerHTML = ongoingPS.map(p => {
-    const days = daysDiff(p.start_date, new Date().toISOString().split('T')[0]);
+    const days = daysDiff(p.start_date, localDateStr());
     return `<div class="ongoing-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div><div style="font-size:15px;font-weight:700;color:var(--text1)">${p.name} · ${p.symbol}</div><div style="font-size:12px;color:var(--text3)">${p.start_date||'-'} ~ 진행 중 (${days}일째)</div></div>
@@ -2143,7 +2153,7 @@ function openAddSheet() {
   document.getElementById('add-sheet-title').textContent = '새 무매 추가';
   document.getElementById('del-btn').style.display = 'none';
   ['f-name','f-seed','f-initial-seed','f-r','f-t','f-avg','f-qty','f-profit'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-date').value = localDateStr();
   resetSegs();
   document.getElementById('add-overlay').classList.add('open');
 }
@@ -2376,7 +2386,7 @@ function openTradeEdit(portId, tradeIdx) {
 }
 
 function toDateInput(d) {
-  if (!d) return new Date().toISOString().split('T')[0];
+  if (!d) return localDateStr();
   if (d.includes('-')) return d;
   const [m, day] = d.split('/');
   const y = new Date().getFullYear();
