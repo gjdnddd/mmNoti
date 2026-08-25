@@ -295,6 +295,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <button class="icon-btn" onclick="takeOrderSnapshot()" title="오늘 주문 세팅을 저장해서 체결 자동입력 대조에 사용">📸 스냅샷</button>
       </div>
     </div>
+    <div id="snapshot-reminder" class="notice-box" style="display:none;margin-bottom:12px;cursor:pointer" onclick="takeOrderSnapshot()">
+      <div class="notice-txt">⚠️ 오늘 주문 스냅샷을 아직 안 찍었어요 — 세팅 완료 후 눌러주세요. 안 찍으면 체결이 자동입력 안 되고 대기 목록에만 남습니다.</div>
+    </div>
     <div class="summary-card">
       <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:12px">전체 진행 상황</div>
       <div class="summary-inner">
@@ -1271,16 +1274,35 @@ function reverseExitPrice(p) { return p.avg_price * (1 - p.R / 100); }
 // 방식이라 며칠 밀린 체결이나 T값 변동 중간에 들어오는 체결도 안전하게 처리 가능).
 function buildOrderSnapshot(p) {
   const reverse = isReverseMode(p);
+  const secondHalf = !reverse && isSecondHalf(p);
   return {
     date: new Date().toISOString().split('T')[0],
     timestamp: Date.now(),
     mode: p.mode,
+    secondHalf,
     avgQty: reverse ? 0 : avgQty(p),
     starQty: reverse ? 0 : starQty(p),
     sell25qty: sell25qty(p),
     sell75qty: sell75qty(p),
-    reverseSellQty: reverse ? reverseSellQty(p) : 0
+    reverseSellQty: reverse ? reverseSellQty(p) : 0,
+    // LOC는 "종가가 설정가를 넘었는지"로 체결 여부가 갈리므로, 체결가가 그 방향과
+    // 맞는지 확인하는 안전장치로 설정가도 같이 저장한다 (수량이 우연히 같아도
+    // 가격 방향이 안 맞으면 자동입력하지 않음).
+    avgPrice: p.avg_price,
+    buyPrice: calcBuyP(p),
+    starPrice: calcStarP(p),
+    sellPrice: calcSellP(p)
   };
+}
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function yesterdayStr() { return new Date(Date.now() - 86400000).toISOString().split('T')[0]; }
+
+function hasTodaySnapshot() {
+  const today = todayStr();
+  const active = state.portfolios.filter(p => !p.ended);
+  if (!active.length) return true;
+  return active.every(p => (p.orderSnapshots || []).some(s => s.date === today));
 }
 
 async function takeOrderSnapshot() {
@@ -1293,30 +1315,58 @@ async function takeOrderSnapshot() {
   });
   saveLocal();
   await saveToGist();
+  renderAll();
   showToast(`✓ 오늘 주문 스냅샷 저장 (${active.length}개 포트폴리오)`);
 }
 
-// 새 체결(item)을 포트폴리오 p의 스냅샷 이력(최신순)과 대조해 tInc/sellType을 판정.
-// 확실히 맞는 경우에만 값을 반환하고, 애매하면 null(자동입력 보류 → 기존처럼 대기 목록행).
+// 새 체결(item)을 포트폴리오 p의 "가장 최근 스냅샷 하나"와 대조해 tInc/sellType을 판정.
+// 오늘 스냅샷이 있으면 그것만, 없으면 어제 것 중 최신 하나만 사용한다 — 여러 스냅샷을
+// 순회하며 넘어가면(예: 같은 날 구버전/신버전 스냅샷이 섞인 경우) 뒤쪽 스냅샷의 값과
+// 우연히 일치해 잘못 판정할 위험이 있다. 오래된 스냅샷까지 뒤지지 않는 것도 같은 이유
+// (그사이 평단·T값이 바뀌어 엉뚱한 수량과 우연히 일치할 수 있음 — 실제로 겪은 사고).
+// 확실히 맞는 경우에만 값을 반환하고, 애매하면 null(자동입력 보류 → 대기 목록).
 function matchTradeToSnapshot(p, item) {
-  const snaps = (p.orderSnapshots || []).slice().reverse();
-  for (const s of snaps) {
-    if (item.type === '매수') {
-      if (s.mode === 'reverse') continue; // 리버스 매수는 잔금/4라 수량으로 특정 어려움 → 보류
-      const matchAvg = s.avgQty > 0 && item.qty === s.avgQty;
-      const matchStar = s.starQty > 0 && item.qty === s.starQty;
-      if (matchAvg || matchStar) return { tInc: '+0.5' };
-      if (item.qty === 1 && s.avgQty >= 2 && s.starQty >= 2) return { tInc: '+0' };
-    } else {
-      if (s.mode === 'reverse') {
-        if (s.reverseSellQty > 0 && item.qty === s.reverseSellQty) return { reverse: true };
-        continue;
+  const today = todayStr(), yesterday = yesterdayStr();
+  const candidates = (p.orderSnapshots || []).filter(sn => sn.date === today || sn.date === yesterday);
+  if (!candidates.length) return null;
+  const s = candidates.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+  const PRICE_EPS = 0.02;
+  // 구버전(가격 필드 도입 전) 스냅샷은 방향성 체크를 건너뛰고 수량만으로 판정.
+  const priceOk = (fillPrice, limitPrice, mustBeAtMost) => {
+    if (limitPrice === undefined) return true;
+    return mustBeAtMost ? fillPrice <= limitPrice + PRICE_EPS : fillPrice >= limitPrice - PRICE_EPS;
+  };
+
+  if (item.type === '매수') {
+    if (s.mode === 'reverse') return null; // 리버스 매수는 잔금/4라 수량으로 특정 어려움 → 보류
+    if (item.qty === 1) {
+      // 사다리는 항상 1주라, 평단·별지점LOC 수량이 우연히 1주가 되는 날엔
+      // 어느 쪽 체결인지 구분이 안 된다 — 하나라도 1이면 보류.
+      if (s.secondHalf) {
+        if (s.starQty >= 2) return { tInc: '+0' };
+        return null;
       }
-      if (s.sell25qty > 0 && item.qty === s.sell25qty) return { sellType: '쿼터매도 25%' };
-      if (s.sell75qty > 0 && item.qty === s.sell75qty) return { sellType: '지정가매도 75%' };
+      if (s.avgQty === 1 || s.starQty === 1) return null;
+      if (s.avgQty >= 2 && s.starQty >= 2) return { tInc: '+0' };
+      return null;
     }
+    if (s.secondHalf) {
+      // 후반전은 하루 매수금 전체가 별지점LOC 하나 — "1회 전체" 체결이라 T+1 (규칙 §2)
+      if (s.starQty > 0 && item.qty === s.starQty && priceOk(item.price, s.buyPrice, true)) return { tInc: '+1' };
+      return null;
+    }
+    if (s.avgQty > 0 && item.qty === s.avgQty && priceOk(item.price, s.avgPrice, true)) return { tInc: '+0.5' };
+    if (s.starQty > 0 && item.qty === s.starQty && priceOk(item.price, s.buyPrice, true)) return { tInc: '+0.5' };
+    return null;
+  } else {
+    if (s.mode === 'reverse') {
+      if (s.reverseSellQty > 0 && item.qty === s.reverseSellQty) return { reverse: true };
+      return null;
+    }
+    if (s.sell25qty > 0 && item.qty === s.sell25qty && priceOk(item.price, s.starPrice, false)) return { sellType: '쿼터매도 25%' };
+    if (s.sell75qty > 0 && item.qty === s.sell75qty && priceOk(item.price, s.sellPrice, false)) return { sellType: '지정가매도 75%' };
+    return null;
   }
-  return null;
 }
 function calcBuyQtys(p) {
   const M = calcM(p);
@@ -1368,6 +1418,8 @@ function renderAll() {
 //  SUMMARY
 // ══════════════════════════════════════════════
 function renderSummary() {
+  const reminderEl = document.getElementById('snapshot-reminder');
+  if (reminderEl) reminderEl.style.display = hasTodaySnapshot() ? 'none' : 'block';
   const ps = state.portfolios.filter(p => !p.ended);
   const totalSeed = state.totalSeed || 0;
   const allocatedSeed = ps.reduce((s,p) => s + p.seed, 0);
