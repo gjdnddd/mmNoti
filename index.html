@@ -2045,7 +2045,7 @@ function renderCycle() {
       <div class="grid3">
         <div class="metric"><div class="m-label">T값</div><div class="m-val">${p.t_value}/${p.D}</div></div>
         <div class="metric"><div class="m-label">진행률</div><div class="m-val">${calcProg(p).toFixed(1)}%</div></div>
-        <div class="metric"><div class="m-label">누적수익</div><div class="m-val" style="color:var(--green)">$${p.acc_profit}</div></div>
+        <div class="metric"><div class="m-label">누적수익</div><div class="m-val" style="color:${p.acc_profit>=0?'var(--green)':'var(--red)'}">$${p.acc_profit}</div></div>
       </div>
     </div>`;
   }).join('');
