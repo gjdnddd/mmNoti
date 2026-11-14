@@ -118,6 +118,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
 .o-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
 .t-loc { background: var(--blue2); color: #fff; }
 .t-limit { background: #6b21a8; color: #fff; }
+.t-moc { background: #b45309; color: #fff; }
+.plan-warn { font-size: 12px; color: #fbbf24; line-height: 1.5; padding: 4px 16px; }
+.plan-block { font-size: 13px; font-weight: 700; color: #f87171; line-height: 1.5; padding: 6px 16px; }
+.plan-info { font-size: 12px; color: var(--text3); line-height: 1.6; padding: 4px 16px; }
+.ladder-ctrl { display: flex; gap: 6px; margin-top: 6px; }
+.ladder-btn { background: var(--bg3); border: 0.5px solid var(--border2); border-radius: 6px; padding: 3px 12px; font-size: 12px; color: var(--text2); cursor: pointer; }
 .o-desc { font-size: 13px; color: var(--text3); }
 .o-pct { font-size: 13px; color: var(--green); font-weight: 600; }
 .o-val { font-size: 14px; font-weight: 600; color: var(--text1); }
@@ -296,7 +302,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       </div>
     </div>
     <div id="snapshot-reminder" class="notice-box" style="display:none;margin-bottom:12px;cursor:pointer" onclick="takeOrderSnapshot()">
-      <div class="notice-txt">⚠️ 오늘 주문 스냅샷을 아직 안 찍었어요 — 세팅 완료 후 눌러주세요. 안 찍으면 체결이 자동입력 안 되고 대기 목록에만 남습니다.</div>
+      <div class="notice-txt" id="snapshot-reminder-txt">⚠️ 주문 스냅샷을 아직 안 찍었어요 — 세팅 확인 후 눌러주세요. 안 찍으면 그날 체결은 자동입력되지 않고 대기 목록에 남습니다.</div>
     </div>
     <div class="summary-card">
       <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:12px">전체 진행 상황</div>
@@ -365,7 +371,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       </div>
     </div>
     <div class="card">
-      <div class="card-title">소진모드 종가 기록 (최근 5거래일 평균 사용)</div>
+      <div class="card-title">종가 기록 (미국 거래일 · 소진모드 L5용)</div>
+      <div style="font-size:12px;color:var(--text4);margin-bottom:8px">평소엔 비어 있어도 됩니다. 체결가가 자동으로 기록되고, 소진모드에서만 최근 5거래일이 필요해요.</div>
       <div id="close-history-list"></div>
       <div class="grid2" style="margin-top:8px">
         <input class="form-input" id="ch-date" type="date" />
@@ -379,53 +386,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <span class="badge badge-ver" id="d-ver2">Ver 4.0</span>
         <span class="badge" id="d-phase" style="display:none;background:#f5c842;color:#000">후반전</span>
       </div>
-      <div id="normal-guide">
-        <div style="margin-bottom:12px">
-          <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--red);color:#fff;margin-bottom:8px">매수</div>
-          <div class="guide-order">
-            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
-            <div class="o-val" id="g-buy1">-</div>
-          </div>
-          <div class="guide-order">
-            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-buy2-pct">-</span></div>
-            <div class="o-val" id="g-buy2">-</div>
-          </div>
-          <div style="margin-top:8px">
-            <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
-            <div id="d-ladder" class="ladder-list"></div>
-          </div>
-        </div>
-        <div>
-          <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:var(--blue);color:#fff;margin-bottom:8px">매도</div>
-          <div class="guide-order">
-            <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct" id="g-sell1-pct">-</span></div>
-            <div class="o-val" id="g-sell1">-</div>
-          </div>
-          <div class="guide-order">
-            <div class="order-left"><span class="o-tag t-limit">지정가</span><span class="o-desc" id="g-sell2-pct">-</span></div>
-            <div class="o-val" id="g-sell2">-</div>
-          </div>
-        </div>
-      </div>
-      <div id="reverse-guide" style="display:none">
-        <div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:#f5c842;color:#000;margin-bottom:8px">소진모드(리버스)</div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-desc">별지점(리버스, 5일평균)</span></div>
-          <div class="o-val" id="rv-star">-</div>
-        </div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-desc" id="rv-sell-label">매도</span></div>
-          <div class="o-val" id="rv-sell">-</div>
-        </div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-desc">매수</span></div>
-          <div class="o-val" id="rv-buy">-</div>
-        </div>
-        <div class="guide-order">
-          <div class="order-left"><span class="o-desc">복귀조건 (종가 ≥)</span></div>
-          <div class="o-val" id="rv-exit">-</div>
-        </div>
-      </div>
+      <div id="normal-guide"></div>
       <div class="notice-box">
         <div class="notice-txt">거래 가격과 수량은 입력한 데이터를 바탕으로 계산되며, 수수료·세금·환율은 고려되지 않습니다.</div>
       </div>
@@ -493,6 +454,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         </div>
       </div>
       <div style="margin-bottom:12px;display:none;font-size:13px;color:var(--text3)" id="sell-type-hint">소진모드 매도 — T값 자동 계산됩니다</div>
+      <div style="margin-bottom:12px;display:none;font-size:12px;color:#fbbf24" id="buy-hint">소진모드 매수: 쿼터매수 본주문이면 +1, 사다리면 +0 (T는 하루 한 번만 반영)</div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="ignoreInput()">무시</button>
         <button class="btn-primary" onclick="confirmInput()">입력하기</button>
@@ -583,6 +545,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
         <div class="sync-info" style="margin:0" id="price-sync-info"><span class="sync-dot dot-wait"></span>미연동</div>
       </div>
       <div id="manual-prices" style="margin-top:12px"></div>
+    </div>
+    <div style="padding:0 16px 16px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;color:var(--text4);padding:12px 0 8px">무매 설정</div>
+      <label class="form-label">첫 매수 가격 배수 k (전일 종가 × k)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="first-buy-k-input" type="number" step="0.01" placeholder="1.12" style="flex:1" />
+        <button class="icon-btn" onclick="saveFirstBuyK()">저장</button>
+      </div>
     </div>
     <div class="gist-section">
       <div class="gist-title">Gist 연동</div>
@@ -759,6 +729,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text1); font-fami
       </div>
     </div>
     <div style="margin-bottom:14px;display:none;font-size:13px;color:var(--text3)" id="sell-type-hint-manual">소진모드 매도 — T값 자동 계산됩니다</div>
+    <div style="margin-bottom:14px;display:none;font-size:12px;color:#fbbf24" id="buy-hint-manual">소진모드 매수: 쿼터매수 본주문이면 +1, 사다리면 +0 (T는 하루 한 번만 반영)</div>
     <div class="grid2" style="margin-bottom:14px">
       <div><label class="form-label">날짜</label><input class="form-input" id="manual-date" type="date" /></div>
       <div><label class="form-label">수량 (주)</label><input class="form-input" id="manual-qty" type="number" placeholder="0" /></div>
@@ -884,7 +855,9 @@ function migrateSeedFields() {
     if (p.reverseDayCount === undefined) p.reverseDayCount = 0;
     if (p.closeHistory === undefined) p.closeHistory = [];
     if (p.orderSnapshots === undefined) p.orderSnapshots = [];
+    if (!p.ended) migrateCloseHistory(p);
   });
+  getSettings();
 }
 
 function saveLocal() {
@@ -913,7 +886,9 @@ async function syncGist() {
       if (parsed.totalSeed > 0)            state.totalSeed         = parsed.totalSeed;
       if (parsed.initial_totalSeed > 0)    state.initial_totalSeed = parsed.initial_totalSeed;
       if (parsed.seed_history?.length > 0) state.seed_history      = parsed.seed_history;
+      if (parsed.settings && typeof parsed.settings === 'object') state.settings = { ...(state.settings || {}), ...parsed.settings };
       migrateSeedFields();
+      evaluateReverseExits();
     }
     state.lastSync = new Date().toLocaleTimeString('ko-KR');
     setSyncStatus('ok');
@@ -934,7 +909,7 @@ async function saveToGist() {
   if (!token || !gistId) return;
   try {
     const body = JSON.stringify({
-      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed, seed_history: state.seed_history }, null, 2) } }
+      files: { 'mumae_data.json': { content: JSON.stringify({ portfolios: state.portfolios, pending: state.pending, trades: state.trades, totalSeed: state.totalSeed, initial_totalSeed: state.initial_totalSeed, seed_history: state.seed_history, settings: getSettings() }, null, 2) } }
     });
     const res = await fetch(`https://api.github.com/gists/${gistId}`, {
       method: 'PATCH',
@@ -1024,6 +999,7 @@ async function pollMeritz() {
       state.pending = [...state.pending, ...stillPending];
       renderPending();
     }
+    evaluateReverseExits();
     if (autoApplied.length) renderAll();
     saveLocal();
     await saveToGist();
@@ -1103,6 +1079,17 @@ async function sendToVR(id) {
   } catch(e) { showToast('전송 실패: ' + e.message); }
 }
 
+async function saveFirstBuyK() {
+  const k = parseFloat(document.getElementById('first-buy-k-input').value);
+  if (!(k > 1 && k <= 1.3)) { showToast('k는 1.00 초과 1.30 이하로 입력해주세요'); return; }
+  getSettings();
+  state.settings.firstBuyK = Math.round(k * 100) / 100;
+  saveLocal();
+  renderAll();
+  await saveToGist();
+  showToast('✓ 첫 매수 배수 저장');
+}
+
 function saveFinnhubKey() {
   state.finnhubKey = document.getElementById('finnhub-key-input').value.trim();
   saveLocal();
@@ -1121,31 +1108,25 @@ async function fetchPrices() {
     return;
   }
   let updated = 0;
-  const today = localDateStr();
   for (const sym of symbols) {
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${state.finnhubKey}`);
       if (!res.ok) throw new Error(res.status);
       const data = await res.json();
       if (data.c > 0) {
-        const price = parseFloat(data.c.toFixed(2));
-        state.prices[sym] = price;
+        state.prices[sym] = centRound(data.c);
         updated++;
-        // 소진(리버스) 모드 별지점용 종가 근사치 기록(그날 마지막 조회가) + 복귀조건 체크
-        state.portfolios.filter(p => !p.ended && p.symbol === sym).forEach(p => {
-          if (!p.closeHistory) p.closeHistory = [];
-          const idx = p.closeHistory.findIndex(h => h.date === today);
-          if (idx !== -1) p.closeHistory[idx].price = price;
-          else p.closeHistory.push({ date: today, price });
-          if (p.closeHistory.length > 10) p.closeHistory = p.closeHistory.slice(-10);
-          if (isReverseMode(p) && p.avg_price > 0 && price >= reverseExitPrice(p)) {
-            p.mode = 'normal';
-            p.reverseDayCount = 0;
-          }
-        });
+        // 확정 종가로는 전일종가(pc)만 쓴다(c는 장중·시간외 가격일 수 있음). pc는 마지막 체결 시각(t)이 속한
+        // 거래일의 바로 전 거래일 종가다. 체결가·수동입력이 이미 있으면 덮어쓰지 않는다(recordClose 우선순위).
+        if (data.pc > 0 && data.t > 0) {
+          const pcDate = prevTradingDay(nyDateStr(data.t * 1000));
+          state.portfolios.filter(p => !p.ended && p.symbol === sym)
+            .forEach(p => recordClose(p, pcDate, centRound(data.pc), 'pc'));
+        }
       }
     } catch(e) {}
   }
+  evaluateReverseExits();
   saveLocal();
   if (updated > 0) await saveToGist();
   const now = new Date().toLocaleTimeString('ko-KR');
@@ -1238,10 +1219,17 @@ function calcM(p) {
   const rem = p.D - p.t_value;
   return rem > 0 ? calcRemaining(p) / rem : p.seed / p.D;
 }
+// ── 가격 반올림 (V4.0: 센트 반올림 half-up, 사다리는 센트 내림) ──
+// toFixed(2)는 이진 부동소수 오차로 47.375 같은 값의 반올림 방향이 흔들려서 한 함수로 통일한다.
+function centRound(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
+function centFloor(x) { return Math.floor(x * 100 + 1e-7) / 100; }
+// T는 소수점 제한 없이 저장하고(원본 "그 숫자 자체로 표현"), 화면에서만 3자리로 보여준다.
+function fmtT(t) { return String(Math.round((t || 0) * 1000) / 1000); }
 function calcStarRate(p) { return p.R - (2 * p.R / p.D) * p.t_value; }
-function calcStarP(p) { return p.avg_price > 0 ? p.avg_price * (1 + calcStarRate(p) / 100) : 0; }
-function calcBuyP(p) { const sp = calcStarP(p); return sp > 0 ? parseFloat((sp - 0.01).toFixed(2)) : 0; }
-function calcSellP(p) { return p.avg_price > 0 ? parseFloat((p.avg_price * (1 + p.R / 100)).toFixed(2)) : 0; }
+// 별지점 B = 센트반올림(평단×(1+별%)) — 쿼터 LOC 매도가. 매수가는 B−0.01 (원본 §3-5).
+function calcStarP(p) { return p.avg_price > 0 ? centRound(p.avg_price * (1 + calcStarRate(p) / 100)) : 0; }
+function calcBuyP(p) { const b = calcStarP(p); return b > 0 ? centRound(b - 0.01) : 0; }
+function calcSellP(p) { return p.avg_price > 0 ? centRound(p.avg_price * (1 + p.R / 100)) : 0; }
 function calcProg(p) { return Math.min((p.t_value / p.D) * 100, 100); }
 function halfM(p) { return calcM(p) / 2; }
 function isSecondHalf(p) { return p.t_value >= p.D / 2; }
@@ -1255,16 +1243,270 @@ function toggleSellTypeUI(sectionId, hintId, portfolio) {
   if (sec) sec.style.display = reverse ? 'none' : 'block';
   if (hint) hint.style.display = reverse ? 'block' : 'none';
 }
-// 리버스 별지점 = 직전 5거래일 종가 평균 (무한매수법 규칙 §11). 종가는 앱이 시세 조회 시점마다
-// 자동 기록한 근사치(그날 마지막 조회가)이며, 5일치가 안 쌓였으면 있는 만큼만 평균낸다.
-function calcReverseStarP(p) {
-  const hist = (p.closeHistory || []).slice(-5);
-  if (!hist.length) return p.avg_price;
-  return hist.reduce((s, h) => s + h.price, 0) / hist.length;
+// 소진모드 매수 T 증가 안내 (매수 체결일 때만 의미 있음)
+function toggleBuyHintUI(hintId, portfolio, isBuy) {
+  const hint = document.getElementById(hintId);
+  if (hint) hint.style.display = (portfolio && isReverseMode(portfolio) && isBuy !== false) ? 'block' : 'none';
 }
-function reverseSellQty(p) { return Math.floor(p.hold_qty / (p.D / 2)); }
+// 리버스 매도 수량 = 직전 보유의 D/2 등분, 내림 (원본 2절). 0주면 매도 없음.
+function reverseSellQty(p) { return Math.floor(p.hold_qty * 2 / p.D); }
 function reverseBuyAmount(p) { return calcRemaining(p) / 4; }
 function reverseExitPrice(p) { return p.avg_price * (1 - p.R / 100); }
+// 리버스 별지점 L5 값(계산 불가면 null). 상세 판정은 calcL5.
+function calcReverseStarP(p) { const r = calcL5(p); return r.ok ? r.value : null; }
+
+// ══════════════════════════════════════════════
+//  미국 거래일 (뉴욕 시간대 기준 — 서머타임 자동 반영)
+// ══════════════════════════════════════════════
+// 체결·종가·스냅샷은 모두 "미국 거래일"로 묶는다. 한국 날짜로 묶으면 새벽 체결이 다음 날로
+// 밀리고 주말에 같은 종가가 두 번 기록되는 문제가 있었다(2026-11 실데이터 확인).
+const NY_TZ = 'America/New_York';
+// NYSE 휴장일 (2026~2027). 목록 밖 연도는 평일만으로 판단하고, 종가 기록 화면의 "휴장" 표시로 보정한다.
+const NYSE_HOLIDAYS = new Set([
+  '2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25',
+  '2027-01-01','2027-01-18','2027-02-15','2027-03-26','2027-05-31','2027-06-18','2027-07-05','2027-09-06','2027-11-25','2027-12-24'
+]);
+const _nyFmt = new Intl.DateTimeFormat('en-CA', { timeZone: NY_TZ, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
+function nyParts(ms) {
+  const o = {};
+  _nyFmt.formatToParts(new Date(ms)).forEach(x => { o[x.type] = x.value; });
+  return { date: `${o.year}-${o.month}-${o.day}`, hour: (parseInt(o.hour, 10) || 0) % 24, minute: parseInt(o.minute, 10) || 0 };
+}
+function nyDateStr(ms) { return nyParts(ms).date; }
+function _shiftDate(ds, days) {
+  const [y, m, d] = ds.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+function isTradingDay(ds) {
+  const [y, m, d] = ds.split('-').map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return wd !== 0 && wd !== 6 && !NYSE_HOLIDAYS.has(ds);
+}
+function prevTradingDay(ds) { let d = _shiftDate(ds, -1); while (!isTradingDay(d)) d = _shiftDate(d, -1); return d; }
+function nextTradingDay(ds) { let d = _shiftDate(ds, 1); while (!isTradingDay(d)) d = _shiftDate(d, 1); return d; }
+// 가장 최근에 정규장이 끝난 거래일
+function lastCompletedSession(now) {
+  const n = nyParts(now || Date.now());
+  return (isTradingDay(n.date) && n.hour >= 16) ? n.date : prevTradingDay(n.date);
+}
+// 지금 걸어두는 주문이 체결될 거래일 (정규장 마감 전이면 오늘, 아니면 다음 거래일)
+function currentTargetSession(now) {
+  const n = nyParts(now || Date.now());
+  return (isTradingDay(n.date) && n.hour < 16) ? n.date : nextTradingDay(n.date);
+}
+// 그 거래일이 애프터장까지 끝났는지(지정가 매도는 애프터장까지 유효 → 20:00 ET 이후 확정)
+function sessionDone(ds, now) {
+  const n = nyParts(now || Date.now());
+  return n.date > ds || (n.date === ds && n.hour >= 20);
+}
+// 체결 알림 id(dedupKey) 끝의 postTime(ms) — 폰에 알림이 뜬 시각 = 실제 체결 직후
+function postTimeFromId(id) {
+  if (!id || typeof id !== 'string' || !id.startsWith('meritz_')) return null;
+  const last = id.split('|').pop().replace('meritz_', '');
+  const n = parseInt(last, 10);
+  return n > 1e12 ? n : null;
+}
+// 거래의 미국 거래일. 알림 시각이 있으면 뉴욕 날짜, 없으면 입력된 날짜(수동입력·카톡은 미국 날짜).
+function tradeUsDate(t) {
+  if (t.usDate) return t.usDate;
+  const ms = postTimeFromId(t.id);
+  if (ms) return nyDateStr(ms);
+  const d = t.date || '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const m = d.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return localDateStr();
+  const now = new Date();
+  let y = now.getFullYear();
+  if (parseInt(m[1], 10) > now.getMonth() + 2) y -= 1; // 1월에 12월 거래를 입력하는 경우
+  return `${y}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+}
+
+// ══════════════════════════════════════════════
+//  종가 기록 (미국 거래일 키) — 리버스 L5, 첫 매수 기준가
+// ══════════════════════════════════════════════
+// 출처 우선순위: 수동 입력 > 체결가(LOC·MOC 체결가 = 그날 종가) > Finnhub 전일종가(pc) > 예전 기록.
+const CLOSE_SRC_RANK = { legacy: 0, pc: 1, fill: 2, manual: 3 };
+function trimCloses(p) {
+  p.closeHistory.sort((a, b) => a.date < b.date ? -1 : 1);
+  const priced = p.closeHistory.filter(h => !h.holiday);
+  if (priced.length > 10) {
+    const cutoff = priced[priced.length - 10].date;
+    p.closeHistory = p.closeHistory.filter(h => h.date >= cutoff);
+  }
+}
+function recordClose(p, date, price, src) {
+  if (!date || !(price > 0)) return false;
+  if (!p.closeHistory) p.closeHistory = [];
+  const h = p.closeHistory.find(x => x.date === date);
+  if (h) {
+    if (h.holiday && src !== 'manual') return false;
+    if ((CLOSE_SRC_RANK[h.src] || 0) > CLOSE_SRC_RANK[src]) return false;
+    if (h.price === price && h.src === src) return false;
+    h.price = price; h.src = src; delete h.holiday;
+  } else {
+    p.closeHistory.push({ date, price, src });
+  }
+  trimCloses(p);
+  return true;
+}
+function pricedCloses(p) { return (p.closeHistory || []).filter(h => !h.holiday && h.price > 0); }
+// 체결가로 종가를 기록할 땐 센트 단위로 딱 떨어지는 가격만 쓴다. 큰 주문이 여러 가격에 나눠 체결되면
+// 알림에 평균가(예: 50.4655)가 찍히는데 이건 종가가 아니다. 1주 사다리 체결은 항상 단일 가격이다.
+function isWholeCent(x) { return Math.abs(x * 100 - Math.round(x * 100)) < 1e-6; }
+// 1주 체결가를 가장 믿을 수 있는 값으로 보고, 여러 주 체결가는 그날 체결가 기록이 아직 없을 때만 쓴다.
+function recordFillClose(p, usDate, price, qty) {
+  if (!isWholeCent(price)) return false;
+  if (qty !== 1) {
+    const h = (p.closeHistory || []).find(x => x.date === usDate);
+    if (h && (h.src === 'fill' || h.src === 'manual')) return false;
+  }
+  return recordClose(p, usDate, centRound(price), 'fill');
+}
+// 직전 완료 거래일까지 중 가장 최근 종가
+function latestClose(p, now) {
+  const last = lastCompletedSession(now);
+  const c = pricedCloses(p).filter(h => h.date <= last).sort((a, b) => a.date < b.date ? 1 : -1);
+  return c[0] || null;
+}
+// L5 = 직전 완료 5거래일 종가 평균. 그 사이 빈 거래일이 있으면 계산하지 않고 빈 날짜를 돌려준다
+// (근사치·대체값 금지 — 사용자가 종가를 넣거나 휴장으로 표시해야 계산).
+function calcL5(p, now) {
+  const last = lastCompletedSession(now);
+  const holidays = new Set((p.closeHistory || []).filter(h => h.holiday).map(h => h.date));
+  const byDate = new Map(pricedCloses(p).map(h => [h.date, h]));
+  const used = [], missing = [];
+  let d = last, guard = 0;
+  while (used.length < 5 && guard++ < 40) {
+    if (!holidays.has(d)) {
+      const h = byDate.get(d);
+      if (h) used.push(h); else missing.push(d);
+    }
+    d = prevTradingDay(d);
+  }
+  if (missing.length || used.length < 5) return { ok: false, missing, used };
+  return { ok: true, value: used.reduce((s, h) => s + h.price, 0) / 5, used };
+}
+// 예전 종가 기록(한국 날짜 키, 시세 조회 근사치)을 미국 거래일 키로 옮긴다. 한 번만 실행.
+// 한국 날짜 D에 기록된 값은 미국 직전 거래일 종가였으므로 prevTradingDay(D)로 보정하고,
+// 같은 날짜로 겹치면(주말 재기록) 먼저 기록된 것을 남긴다. 체결가가 있는 날은 체결가로 덮는다.
+function migrateCloseHistory(p) {
+  if (p.closeHistoryV === 2) return false;
+  const legacy = (p.closeHistory || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  p.closeHistory = [];
+  legacy.forEach(h => {
+    if (!(h.price > 0)) return;
+    const usd = /^\d{4}-\d{2}-\d{2}$/.test(h.date) ? prevTradingDay(h.date) : null;
+    if (usd && !p.closeHistory.find(x => x.date === usd)) p.closeHistory.push({ date: usd, price: h.price, src: 'legacy' });
+  });
+  (p.trades || []).forEach(t => {
+    if (!postTimeFromId(t.id)) return;
+    if (t.type === '매수' || (t.sellType || '').startsWith('쿼터')) recordFillClose(p, tradeUsDate(t), t.price, t.qty);
+  });
+  trimCloses(p);
+  p.closeHistoryV = 2;
+  return true;
+}
+
+// ══════════════════════════════════════════════
+//  주문표 (하루치 주문 계획) — 메인카드·상세·검증·스냅샷이 모두 이 결과를 쓴다
+// ══════════════════════════════════════════════
+const LADDER_MIN = 6, LADDER_MAX = 10;
+function getSettings() {
+  if (!state.settings) state.settings = {};
+  const s = state.settings;
+  if (!(s.ladderShow >= LADDER_MIN && s.ladderShow <= LADDER_MAX)) s.ladderShow = LADDER_MIN;
+  if (!(s.firstBuyK > 1)) s.firstBuyK = 1.12;
+  return s;
+}
+// 사다리: 센트내림(예산/(N+i)), 같은 가격은 수량 합침, 본주문 매수가 이상은 버림. 항상 최대 10단을 계산하고
+// 화면은 설정한 단수만큼 보여준다(검증·체결 대조는 10단 전체 사용).
+function buildLadder(budget, N, capPrice) {
+  if (!(budget > 0) || !(N > 0)) return [];
+  const map = new Map();
+  for (let i = 1; i <= LADDER_MAX; i++) {
+    const price = centFloor(budget / (N + i));
+    if (!(price > 0) || (capPrice > 0 && price >= capPrice)) continue;
+    map.set(price, (map.get(price) || 0) + 1);
+  }
+  return [...map.entries()].sort((a, b) => b[0] - a[0]).map(([price, qty]) => ({ price, qty }));
+}
+// kind: first(첫 매수) | first-half(전반전) | second-half(후반전) | reverse-day1 | reverse | reverse-moc(재소진) | none
+// block: 값이 있으면 이 주문표로 스냅샷을 찍을 수 없음(사유)
+function buildOrderPlan(p, now) {
+  now = now || Date.now();
+  const plan = { kind: 'none', M: 0, mains: [], ladder: [], sells: [], warnings: [], block: null, l5: null, l5info: null, targetDate: currentTargetSession(now) };
+  const Q = p.hold_qty || 0;
+  if (isReverseMode(p)) {
+    const qSell = reverseSellQty(p);
+    if (!p.reverseDayCount) {
+      plan.kind = 'reverse-day1';
+      plan.sells.push({ role: 'reverse', type: 'MOC', label: '1일차 MOC 매도', price: null, qty: qSell });
+      return plan; // 리버스 첫날은 매수 없음
+    }
+    const l5 = calcL5(p, now);
+    plan.l5info = l5;
+    if (!l5.ok) { plan.kind = 'reverse'; plan.block = '종가 확인 필요: ' + l5.missing.join(', '); return plan; }
+    const L = centRound(l5.value);
+    plan.l5 = L;
+    const budget = calcRemaining(p) / 4;
+    plan.M = budget;
+    const buyP = centRound(L - 0.01);
+    const N = buyP > 0 ? Math.floor(budget / buyP) : 0;
+    if (N < 1) {
+      plan.kind = 'reverse-moc';
+      plan.sells.push({ role: 'reverse', type: 'MOC', label: '재소진 MOC 매도', price: null, qty: qSell });
+      plan.warnings.push('쿼터매수로 1주도 살 수 없어 MOC 매도(재소진)');
+      return plan;
+    }
+    plan.kind = 'reverse';
+    plan.sells.push({ role: 'reverse', type: 'LOC', label: '리버스 매도', price: L, qty: qSell });
+    plan.mains.push({ role: 'quarterBuy', type: 'LOC', label: '쿼터매수', price: buyP, qty: N });
+    plan.ladder = buildLadder(budget, N, buyP);
+    return plan;
+  }
+  if (Q === 0 && !(p.t_value > 0)) {
+    plan.kind = 'first';
+    const M = calcM(p);
+    plan.M = M;
+    const prev = latestClose(p, now);
+    if (!prev) { plan.block = '첫 매수 가격 계산에 전일 종가가 필요해요 (종가 기록에서 입력)'; return plan; }
+    const last = lastCompletedSession(now);
+    if (prev.date !== last) plan.warnings.push(`${last} 종가가 없어 ${prev.date} 종가로 계산했어요`);
+    const k = getSettings().firstBuyK;
+    const P0 = centRound(prev.price * k);
+    const N = Math.floor(M / P0);
+    plan.firstBase = prev;
+    plan.mains.push({ role: 'first', type: 'LOC', label: '첫 매수', price: P0, qty: N });
+    plan.ladder = buildLadder(M, N, P0);
+    return plan;
+  }
+  if (Q === 0) return plan; // T>0인데 보유 0 → 사이클 종료 확인 대기
+  const M = calcM(p);
+  plan.M = M;
+  const B = calcStarP(p), buyP = calcBuyP(p);
+  if (isSecondHalf(p)) {
+    plan.kind = 'second-half';
+    const N = buyP > 0 ? Math.floor(M / buyP) : 0;
+    plan.mains.push({ role: 'star', type: 'LOC', label: '별지점', price: buyP, qty: N });
+    plan.ladder = buildLadder(M, N, buyP);
+  } else {
+    plan.kind = 'first-half';
+    const { xQty, yQty } = calcBuyQtys(p);
+    plan.mains.push({ role: 'avg', type: 'LOC', label: '평단', price: centRound(p.avg_price), qty: xQty });
+    plan.mains.push({ role: 'star', type: 'LOC', label: '별지점', price: buyP, qty: yQty });
+    const active = plan.mains.filter(m => m.qty > 0);
+    const cap = active.length ? Math.min(...active.map(m => m.price)) : buyP;
+    plan.ladder = buildLadder(M, xQty + yQty, cap);
+  }
+  plan.sells.push({ role: 'quarter', type: 'LOC', label: '쿼터 매도', price: B, qty: sell25qty(p) });
+  plan.sells.push({ role: 'limit', type: '지정가', label: '지정가 매도', price: calcSellP(p), qty: sell75qty(p) });
+  // 가드: 매수가가 쿼터 매도가 이상이면 종가에 따라 같은 날 사고팔 수 있음 → 스냅샷 차단
+  const buys = plan.mains.filter(m => m.qty > 0).map(m => m.price);
+  const maxBuy = buys.length ? Math.max(...buys) : 0;
+  if (B > 0 && maxBuy >= B) plan.block = `매수가 $${maxBuy.toFixed(2)}가 쿼터 매도가 $${B.toFixed(2)} 이상이에요 — 평단·T값을 확인하세요`;
+  return plan;
+}
 
 // ══════════════════════════════════════════════
 //  주문 스냅샷 (자동입력 대조용)
@@ -1272,26 +1514,30 @@ function reverseExitPrice(p) { return p.avg_price * (1 - p.R / 100); }
 // 오늘 실제로 걸어둔 주문의 예상 체결수량을 저장해뒀다가, 나중에 들어오는 체결 알림의
 // 수량과 대조해서 T값/매도종류를 자동 판정한다 (재계산이 아니라 실제 주문 스냅샷과 대조하는
 // 방식이라 며칠 밀린 체결이나 T값 변동 중간에 들어오는 체결도 안전하게 처리 가능).
-function buildOrderSnapshot(p) {
-  const reverse = isReverseMode(p);
-  const secondHalf = !reverse && isSecondHalf(p);
+// v2: 주문표(buildOrderPlan) 전체를 저장한다. usDate = 이 주문이 체결될 미국 거래일.
+// 스냅샷은 그 거래일의 체결에만 쓰이고, 지나면 만료된다(안 찍었으면 자동입력 안 함).
+const SNAPSHOT_V = 2;
+function buildOrderSnapshot(p, plan) {
+  plan = plan || buildOrderPlan(p);
   return {
+    v: SNAPSHOT_V,
     date: localDateStr(),
+    usDate: plan.targetDate,
     timestamp: Date.now(),
     mode: p.mode,
-    secondHalf,
-    avgQty: reverse ? 0 : avgQty(p),
-    starQty: reverse ? 0 : starQty(p),
-    sell25qty: sell25qty(p),
-    sell75qty: sell75qty(p),
-    reverseSellQty: reverse ? reverseSellQty(p) : 0,
-    // LOC는 "종가가 설정가를 넘었는지"로 체결 여부가 갈리므로, 체결가가 그 방향과
-    // 맞는지 확인하는 안전장치로 설정가도 같이 저장한다 (수량이 우연히 같아도
-    // 가격 방향이 안 맞으면 자동입력하지 않음).
+    kind: plan.kind,
+    secondHalf: plan.kind === 'second-half',
+    firstBuy: plan.kind === 'first',
+    holdQty: p.hold_qty,
     avgPrice: p.avg_price,
-    buyPrice: calcBuyP(p),
-    starPrice: calcStarP(p),
-    sellPrice: calcSellP(p)
+    tValue: p.t_value,
+    // LOC는 종가가 설정가를 넘었는지로 체결이 갈리므로, 체결가 방향 확인용으로 가격도 저장한다.
+    mains: plan.mains.map(m => ({ role: m.role, price: m.price, qty: m.qty })),
+    ladder: plan.ladder.map(l => ({ price: l.price, qty: l.qty })),
+    ladderShown: getSettings().ladderShow,
+    sells: plan.sells.map(s => ({ role: s.role, type: s.type, price: s.price, qty: s.qty })),
+    l5: plan.l5,
+    reverseMoc: plan.kind === 'reverse-day1' || plan.kind === 'reverse-moc'
   };
 }
 
@@ -1308,78 +1554,75 @@ function localDateStr(d) {
 function todayStr() { return localDateStr(); }
 function yesterdayStr() { return localDateStr(new Date(Date.now() - 86400000)); }
 
-function hasTodaySnapshot() {
-  const today = todayStr();
+// 다음에 체결될 거래일용 스냅샷이 모든 진행 포트폴리오에 있는지 (안내 배너용)
+function hasTodaySnapshot(now) {
+  const target = currentTargetSession(now);
   const active = state.portfolios.filter(p => !p.ended);
   if (!active.length) return true;
-  return active.every(p => (p.orderSnapshots || []).some(s => s.date === today));
+  return active.every(p => (p.orderSnapshots || []).some(s => s.v === SNAPSHOT_V && s.usDate === target));
 }
 
 async function takeOrderSnapshot() {
   const active = state.portfolios.filter(p => !p.ended);
   if (!active.length) { showToast('진행 중인 포트폴리오가 없어요'); return; }
-  active.forEach(p => {
+  // 한 포트폴리오라도 주문표에 문제가 있으면 전체를 막는다(둘 다 정상이어야 운영 가능).
+  const plans = active.map(p => ({ p, plan: buildOrderPlan(p) }));
+  const blocked = plans.filter(x => x.plan.block);
+  if (blocked.length) {
+    showToast('⚠️ 스냅샷 저장 안 됨 — ' + blocked.map(x => `${x.p.name}: ${x.plan.block}`).join(' / '), 6000);
+    return;
+  }
+  plans.forEach(({ p, plan }) => {
     if (!p.orderSnapshots) p.orderSnapshots = [];
-    p.orderSnapshots.push(buildOrderSnapshot(p));
+    p.orderSnapshots.push(buildOrderSnapshot(p, plan));
     if (p.orderSnapshots.length > 10) p.orderSnapshots = p.orderSnapshots.slice(-10);
   });
   saveLocal();
   await saveToGist();
   renderAll();
-  showToast(`✓ 오늘 주문 스냅샷 저장 (${active.length}개 포트폴리오)`);
+  showToast(`✓ ${plans[0].plan.targetDate} 거래일 주문 스냅샷 저장 (${active.length}개 포트폴리오)`);
 }
 
-// 새 체결(item)을 포트폴리오 p의 "가장 최근 스냅샷 하나"와 대조해 tInc/sellType을 판정.
-// 오늘 스냅샷이 있으면 그것만, 없으면 어제 것 중 최신 하나만 사용한다 — 여러 스냅샷을
-// 순회하며 넘어가면(예: 같은 날 구버전/신버전 스냅샷이 섞인 경우) 뒤쪽 스냅샷의 값과
-// 우연히 일치해 잘못 판정할 위험이 있다. 오래된 스냅샷까지 뒤지지 않는 것도 같은 이유
-// (그사이 평단·T값이 바뀌어 엉뚱한 수량과 우연히 일치할 수 있음 — 실제로 겪은 사고).
-// 확실히 맞는 경우에만 값을 반환하고, 애매하면 null(자동입력 보류 → 대기 목록).
+// 새 체결(item)을 "그 체결의 미국 거래일을 대상으로 찍은 스냅샷" 중 최신 것과 대조해 판정한다.
+// 그 거래일용 스냅샷이 없거나 구버전이면 null(자동입력 안 함 → 대기 목록).
+// 확실히 맞는 경우에만 값을 반환한다.
 function matchTradeToSnapshot(p, item) {
-  const today = todayStr(), yesterday = yesterdayStr();
-  const candidates = (p.orderSnapshots || []).filter(sn => sn.date === today || sn.date === yesterday);
-  if (!candidates.length) return null;
-  const s = candidates.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
-  // 구버전(후반전 여부 필드 도입 전) 스냅샷은 형식이 안 맞아 신뢰할 수 없으므로 무조건 보류.
-  // 예전엔 이런 스냅샷도 수량만으로 매칭해서, 코드 업데이트 후 새 스냅샷을 안 찍으면
-  // 조용히 예전 방식(후반전 미반영)으로 되돌아가는 사고가 있었다(2026-08-26 실사고).
-  if (s.secondHalf === undefined) return null;
-  const PRICE_EPS = 0.02;
-  const priceOk = (fillPrice, limitPrice, mustBeAtMost) => {
-    if (limitPrice === undefined) return true;
-    return mustBeAtMost ? fillPrice <= limitPrice + PRICE_EPS : fillPrice >= limitPrice - PRICE_EPS;
-  };
+  if (!postTimeFromId(item.id)) return null; // 체결 시각을 모르면 거래일을 특정할 수 없음
+  const usDate = tradeUsDate(item);
+  const snaps = (p.orderSnapshots || []).filter(sn => sn.v === SNAPSHOT_V && sn.usDate === usDate);
+  if (!snaps.length) return null;
+  const s = snaps.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+  const EPS = 0.02;
 
   if (item.type === '매수') {
-    if (s.mode === 'reverse') return null; // 리버스 매수는 잔금/4라 수량으로 특정 어려움 → 보류
-    if (item.qty === 1) {
-      // 사다리는 항상 1주라, 평단·별지점LOC 수량이 우연히 1주가 되는 날엔
-      // 어느 쪽 체결인지 구분이 안 된다 — 하나라도 1이면 보류.
-      if (s.secondHalf) {
-        if (s.starQty >= 2) return { tInc: '+0' };
-        return null;
-      }
-      if (s.avgQty === 1 || s.starQty === 1) return null;
-      if (s.avgQty >= 2 && s.starQty >= 2) return { tInc: '+0' };
-      return null;
+    if (s.mode === 'reverse') return null; // 리버스 매수는 수동 확인
+    const mains = s.mains.filter(m => m.qty > 0);
+    const isMainQty = mains.some(m => m.qty === item.qty);
+    const isLadderQty = s.ladder.some(l => l.qty === item.qty);
+    // 본주문 수량과 사다리 수량이 같은 날(예: 본주문이 1주)은 어느 쪽인지 구분이 안 됨 → 보류
+    if (isMainQty && isLadderQty) return null;
+    if (isLadderQty) {
+      const top = s.ladder[0].price; // LOC는 종가로 체결 → 종가가 사다리 최상단 이하여야 함
+      return item.price <= top + EPS ? { tInc: '+0' } : null;
     }
-    if (s.secondHalf) {
-      // 후반전은 하루 매수금 전체가 별지점LOC 하나 — "1회 전체" 체결이라 T+1 (규칙 §2)
-      if (s.starQty > 0 && item.qty === s.starQty && priceOk(item.price, s.buyPrice, true)) return { tInc: '+1' };
-      return null;
+    if (isMainQty) {
+      const m = mains.find(x => x.qty === item.qty && item.price <= x.price + EPS);
+      if (!m) return null;
+      // 첫 매수·후반전은 1회치 전체가 주문 하나 → +1, 전반전은 절반 주문 → +0.5
+      return { tInc: (s.kind === 'first' || s.kind === 'second-half') ? '+1' : '+0.5' };
     }
-    if (s.avgQty > 0 && item.qty === s.avgQty && priceOk(item.price, s.avgPrice, true)) return { tInc: '+0.5' };
-    if (s.starQty > 0 && item.qty === s.starQty && priceOk(item.price, s.buyPrice, true)) return { tInc: '+0.5' };
-    return null;
-  } else {
-    if (s.mode === 'reverse') {
-      if (s.reverseSellQty > 0 && item.qty === s.reverseSellQty) return { reverse: true };
-      return null;
-    }
-    if (s.sell25qty > 0 && item.qty === s.sell25qty && priceOk(item.price, s.starPrice, false)) return { sellType: '쿼터매도 25%' };
-    if (s.sell75qty > 0 && item.qty === s.sell75qty && priceOk(item.price, s.sellPrice, false)) return { sellType: '지정가매도 75%' };
     return null;
   }
+  if (s.mode === 'reverse') {
+    const rs = s.sells.find(x => x.role === 'reverse');
+    if (!rs || !(rs.qty > 0) || item.qty !== rs.qty) return null;
+    if (rs.type === 'LOC' && item.price < rs.price - EPS) return null; // MOC 날은 가격 조건 없음
+    return { reverse: true };
+  }
+  const q = s.sells.find(x => x.role === 'quarter'), l = s.sells.find(x => x.role === 'limit');
+  if (q && q.qty > 0 && item.qty === q.qty && item.price >= q.price - EPS) return { sellType: '쿼터매도 25%' };
+  if (l && l.qty > 0 && item.qty === l.qty && item.price >= l.price - EPS) return { sellType: '지정가매도 75%' };
+  return null;
 }
 function calcBuyQtys(p) {
   const M = calcM(p);
@@ -1398,19 +1641,84 @@ function calcBuyQtys(p) {
 }
 function avgQty(p)  { return calcBuyQtys(p).xQty; }
 function starQty(p) { return calcBuyQtys(p).yQty; }
-function sell25qty(p) { return p.hold_qty - Math.round(p.hold_qty * 0.75); }
-function sell75qty(p) { return Math.round(p.hold_qty * 0.75); }
-function ladderPrices(p) {
-  const M = calcM(p);
-  const { xQty, yQty } = calcBuyQtys(p);
-  const N = xQty + yQty;
-  if (!N || M <= 0) return [];
-  const result = [];
-  for (let i = 1; i <= 6; i++) {
-    const price = parseFloat((M / (N + i)).toFixed(2));
-    if (price > 0) result.push({ price, qty: 1 });
+// 쿼터매도 = 보유의 1/4 내림, 지정가 = 나머지 (원본 예시 141주 → 35 / 106)
+function sell25qty(p) { return Math.floor(p.hold_qty / 4); }
+function sell75qty(p) { return p.hold_qty - Math.floor(p.hold_qty / 4); }
+// 사다리 전체(최대 10단). 화면 표시는 getSettings().ladderShow 단까지만.
+function ladderPrices(p) { return buildOrderPlan(p).ladder; }
+
+// 사다리 표시 단수 (전역 설정, 6~10)
+async function setLadderShow(n) {
+  n = Math.max(LADDER_MIN, Math.min(LADDER_MAX, parseInt(n) || LADDER_MIN));
+  getSettings();
+  state.settings.ladderShow = n;
+  saveLocal();
+  renderAll();
+  const det = document.getElementById('screen-detail');
+  if (det && det.classList.contains('active') && det._portId) openDetail(det._portId);
+  await saveToGist();
+}
+
+// 주문 가이드 HTML (메인 카드·상세 화면 공용). ctx.detail=true면 상세 화면 스타일.
+function renderPlanHtml(p, plan, ctx) {
+  ctx = ctx || {};
+  const detail = !!ctx.detail;
+  const rowCls = detail ? 'guide-order' : 'order-row';
+  const pad = detail ? ' style="padding-left:0;padding-right:0"' : '';
+  const head = (label, cls, bg) => detail
+    ? `<div style="display:inline-block;font-size:13px;font-weight:700;padding:4px 12px;border-radius:6px;background:${bg};color:#fff;margin:8px 0">${label}</div>`
+    : `<div class="section-head"><span class="section-badge ${cls}">${label}</span></div>`;
+  const tagCls = t => t === 'MOC' ? 't-moc' : (t === '지정가' ? 't-limit' : 't-loc');
+  const row = (type, label, val) => `<div class="${rowCls}"><div class="order-left"><span class="o-tag ${tagCls(type)}">${type}</span><span class="o-desc">${label}</span></div><div class="o-val">${val}</div></div>`;
+  let h = '';
+  if (plan.block) h += `<div class="plan-block"${pad}>⛔ ${plan.block}</div>`;
+  (plan.warnings || []).forEach(w => { h += `<div class="plan-warn"${pad}>⚠️ ${w}</div>`; });
+  if (plan.kind === 'none') {
+    h += `<div class="plan-info"${pad}>사이클 종료 확인 대기</div>`;
+    h += `<div style="padding:4px ${detail ? 0 : 16}px 8px"><button class="btn-secondary" style="width:100%" onclick="checkCycleEnd('${p.id}')">사이클 종료 확인</button></div>`;
+    return h;
   }
-  return result;
+  const noBuy = plan.kind === 'reverse-day1' || plan.kind === 'reverse-moc';
+  const isRev = noBuy || plan.kind === 'reverse';
+  if (isRev) {
+    if (plan.l5 != null) h += `<div class="plan-info"${pad}>L5(5일 평균 종가) $${plan.l5.toFixed(2)}</div>`;
+    else if (!plan.block && plan.kind === 'reverse') h +=`<div class="plan-info"${pad}>L5(5일 평균 종가) 계산 불가</div>`;
+    h += `<div class="plan-info"${pad}>복귀 기준: 종가 &gt; $${reverseExitPrice(p).toFixed(2)}</div>`;
+  }
+  // 매수
+  h += head('매수', 's-buy', 'var(--red)');
+  if (noBuy) {
+    h += `<div class="plan-info"${pad}>오늘은 매수 없음</div>`;
+  } else {
+    (plan.mains || []).forEach(m => {
+      h += row(m.type, m.label, `$${m.price.toFixed(2)} × ${m.qty}주`);
+    });
+    if (plan.kind === 'first' && plan.firstBase) {
+      h += `<div class="plan-info"${pad}>전일 종가 $${plan.firstBase.price.toFixed(2)} (${plan.firstBase.date}) × ${getSettings().firstBuyK}</div>`;
+    }
+    const show = getSettings().ladderShow;
+    const lad = (plan.ladder || []).slice(0, show);
+    if (lad.length) {
+      h += `<div class="${detail ? '' : 'ladder-wrap'}" style="${detail ? 'margin-top:8px' : ''}">
+        <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
+        <div class="ladder-list">${lad.map(l => `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`).join('')}</div>
+        <div class="ladder-ctrl">
+          ${show < LADDER_MAX ? `<button class="ladder-btn" onclick="setLadderShow(${show + 1})">+</button>` : ''}
+          ${show > LADDER_MIN ? `<button class="ladder-btn" onclick="setLadderShow(${LADDER_MIN})">접기</button>` : ''}
+        </div>
+      </div>`;
+    }
+  }
+  // 매도
+  h += head('매도', 's-sell', 'var(--blue)');
+  const sells = plan.sells || [];
+  if (!sells.length) h += `<div class="plan-info"${pad}>매도 없음</div>`;
+  sells.forEach(sl => {
+    if (!(sl.qty > 0)) { h += row(sl.type, sl.label, '매도 없음'); return; }
+    const pr = sl.price == null ? '시장가(MOC)' : '$' + sl.price.toFixed(2);
+    h += row(sl.type, sl.label, `${pr} × ${sl.qty}주`);
+  });
+  return h;
 }
 function progColor(pct) { return pct < 30 ? '#22c55e' : pct < 60 ? '#f5c842' : '#ef4444'; }
 
@@ -1425,6 +1733,7 @@ function renderAll() {
   renderCycle();
   renderRecentTrades();
   renderPending();
+  checkPendingCycleEnds();
 }
 
 // ══════════════════════════════════════════════
@@ -1432,7 +1741,12 @@ function renderAll() {
 // ══════════════════════════════════════════════
 function renderSummary() {
   const reminderEl = document.getElementById('snapshot-reminder');
-  if (reminderEl) reminderEl.style.display = hasTodaySnapshot() ? 'none' : 'block';
+  if (reminderEl) {
+    const done = hasTodaySnapshot();
+    reminderEl.style.display = done ? 'none' : 'block';
+    const rt = document.getElementById('snapshot-reminder-txt');
+    if (rt && !done) rt.textContent = `⚠️ ${currentTargetSession()} 거래일 주문 스냅샷을 아직 안 찍었어요 — 세팅 확인 후 눌러주세요. 안 찍으면 그날 체결은 자동입력되지 않고 대기 목록에 남습니다.`;
+  }
   const ps = state.portfolios.filter(p => !p.ended);
   const totalSeed = state.totalSeed || 0;
   const allocatedSeed = ps.reduce((s,p) => s + p.seed, 0);
@@ -1480,10 +1794,6 @@ function renderMainCards() {
   el.innerHTML = activePorts.map(p => {
     const prog = calcProg(p);
     const color = progColor(prog);
-    const bp = calcBuyP(p);
-    const sp = calcStarP(p);
-    const sr = calcStarRate(p).toFixed(2);
-    const ladder = ladderPrices(p);
     const curP = state.prices[p.symbol];
     const pnlPct = (curP && p.avg_price > 0) ? ((curP - p.avg_price) / p.avg_price * 100) : null;
     const pnlTag = pnlPct !== null
@@ -1527,30 +1837,7 @@ function renderMainCards() {
         <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${prog.toFixed(1)}%;background:${color}"></div></div>
         <div class="pc-pct" style="color:${color}">${prog.toFixed(1)}%</div>
       </div>
-      <div class="section-head"><span class="section-badge s-buy">매수</span></div>
-      <div class="order-row">
-        <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-desc">평단</span></div>
-        <div class="o-val">$${p.avg_price.toFixed(2)} × ${avgQty(p)}주</div>
-      </div>
-      <div class="order-row">
-        <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct">${sr}%</span></div>
-        <div class="o-val">$${bp.toFixed(2)} × ${starQty(p)}주</div>
-      </div>
-      <div class="ladder-wrap">
-        <div class="ladder-sub">+@ 폭락장 대비 추가 매수</div>
-        <div class="ladder-list">
-          ${ladder.map(l => `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`).join('')}
-        </div>
-      </div>
-      <div class="section-head"><span class="section-badge s-sell">매도</span></div>
-      <div class="order-row">
-        <div class="order-left"><span class="o-tag t-loc">LOC</span><span class="o-pct">${sr}%</span></div>
-        <div class="o-val">$${sp.toFixed(2)} × ${sell25qty(p)}주</div>
-      </div>
-      <div class="order-row">
-        <div class="order-left"><span class="o-tag t-limit">지정가</span><span class="o-desc">${p.R}%</span></div>
-        <div class="o-val">$${calcSellP(p).toFixed(2)} × ${sell75qty(p)}주</div>
-      </div>
+      ${renderPlanHtml(p, buildOrderPlan(p), { id: p.id })}
       <button class="more-btn" onclick="openDetail('${p.id}')">더보기 ▾</button>
     </div>`;
   }).join('');
@@ -1564,8 +1851,7 @@ function openDetail(id) {
   if (!p) return;
   const prog = calcProg(p);
   const sr = calcStarRate(p).toFixed(2);
-  const sp = calcStarP(p);
-  const bp = calcBuyP(p);
+  const plan = buildOrderPlan(p);
   const mVal = calcM(p);
   const used = (p.avg_price * p.hold_qty).toFixed(2);
   const dCurP = state.prices[p.symbol];
@@ -1575,7 +1861,7 @@ function openDetail(id) {
   document.getElementById('d-symbol').textContent = p.symbol;
   document.getElementById('d-symbol2').textContent = p.name;
   document.getElementById('d-pct').textContent = prog.toFixed(1) + '%';
-  document.getElementById('d-tsub').textContent = p.t_value + 'T / ' + p.D;
+  document.getElementById('d-tsub').textContent = fmtT(p.t_value) + 'T / ' + p.D;
   document.getElementById('d-date').textContent = (p.start_date || '-') + ' ~';
   const initSeed = p.initial_seed || p.seed;
   const seedChanged = initSeed !== p.seed;
@@ -1586,35 +1872,16 @@ function openDetail(id) {
     + (dPnl !== null ? ` <span style="font-size:12px;font-weight:700;color:${dPnl>=0?'#4ade80':'#f87171'}">(${dPnl>=0?'▲':'▼'}${Math.abs(dPnl).toFixed(1)}%)</span>` : '');
   document.getElementById('d-qty').textContent = p.hold_qty + '주';
   document.getElementById('d-invested').textContent = '$' + used;
-  document.getElementById('d-t').textContent = p.t_value;
+  document.getElementById('d-t').textContent = fmtT(p.t_value);
   document.getElementById('d-r').textContent = p.R + '%';
-  document.getElementById('d-star').textContent = sp.toFixed(2) + ' (' + sr + '%)';
-  const reverse = isReverseMode(p);
-  document.getElementById('d-phase').style.display = (isSecondHalf(p) || reverse) ? 'inline-block' : 'none';
-  document.getElementById('d-phase').textContent = reverse ? '소진모드' : '후반전';
-  document.getElementById('normal-guide').style.display = reverse ? 'none' : 'block';
-  document.getElementById('reverse-guide').style.display = reverse ? 'block' : 'none';
-  if (reverse) {
-    const rvStar = calcReverseStarP(p);
-    const histLen = (p.closeHistory || []).length;
-    document.getElementById('rv-star').textContent = '$' + rvStar.toFixed(2) + (histLen < 5 ? ` (${histLen}일치만 반영)` : '');
-    document.getElementById('rv-sell-label').textContent = p.reverseDayCount === 0 ? '1일차 MOC 매도 (무조건)' : '별지점 이상시 매도';
-    document.getElementById('rv-sell').textContent = reverseSellQty(p) + '주';
-    document.getElementById('rv-buy').textContent = p.reverseDayCount === 0 ? '1일차는 매수 없음' : ('별지점 아래 $' + reverseBuyAmount(p).toFixed(2) + '어치');
-    document.getElementById('rv-exit').textContent = '$' + reverseExitPrice(p).toFixed(2);
-  } else {
-    document.getElementById('g-buy1').textContent = isSecondHalf(p) ? '후반전 — 매수 중단' : ('$' + p.avg_price.toFixed(2) + ' × ' + avgQty(p) + '주');
-    document.getElementById('g-buy2-pct').textContent = sr + '%';
-    document.getElementById('g-buy2').textContent = '$' + bp.toFixed(2) + ' × ' + starQty(p) + '주';
-    document.getElementById('g-sell1-pct').textContent = sr + '%';
-    document.getElementById('g-sell1').textContent = '$' + sp.toFixed(2) + ' × ' + sell25qty(p) + '주';
-    document.getElementById('g-sell2-pct').textContent = p.R + '%';
-    document.getElementById('g-sell2').textContent = '$' + calcSellP(p).toFixed(2) + ' × ' + sell75qty(p) + '주';
-    const ladder = ladderPrices(p);
-    document.getElementById('d-ladder').innerHTML = ladder.map(l =>
-      `<div class="ladder-item"><span class="l-tag">LOC</span><span class="l-price">$${l.price.toFixed(2)}</span><span class="l-qty">× ${l.qty}주</span></div>`
-    ).join('');
-  }
+  document.getElementById('d-star').textContent = calcStarP(p).toFixed(2) + ' (' + sr + '%)';
+  const phaseTxt = plan.kind === 'first' ? '첫 매수' : plan.kind === 'second-half' ? '후반전'
+    : (plan.kind === 'reverse' || plan.kind === 'reverse-day1' || plan.kind === 'reverse-moc') ? '소진모드' : '';
+  document.getElementById('d-phase').style.display = phaseTxt ? 'inline-block' : 'none';
+  document.getElementById('d-phase').textContent = phaseTxt;
+  document.getElementById('normal-guide').innerHTML = renderPlanHtml(p, plan, { id, detail: true });
+  const chd = document.getElementById('ch-date');
+  if (chd) chd.value = lastCompletedSession();
   const trades = (p.trades || []).slice().reverse();
   document.getElementById('d-trades').innerHTML = trades.length
     ? trades.map((t, i) => { const ri = (p.trades||[]).length-1-i; const tCell = t.type==='매수' ? (t.tInc||'+0.5') : (t.sellType ? (t.sellType.startsWith('쿼터매도')?'×0.75':'완전매도') : '-'); return `<tr><td>${t.date}${t.time ? '<br><span style="font-size:10px;color:var(--text3)">' + t.time + '</span>' : ''}</td><td class="${t.type==='매수'?'td-buy':'td-sell'}">${t.type}</td><td>$${t.price.toFixed(2)}</td><td>${t.qty}주</td><td>${tCell}</td><td style="white-space:nowrap"><button class="trade-act-btn trade-edit-btn" onclick="openTradeEdit('${id}',${ri})">수정</button> <button class="trade-act-btn trade-del-btn2" onclick="deleteTrade('${id}',${ri})">×</button></td></tr>`; }).join('')
@@ -1630,24 +1897,49 @@ function openDetail(id) {
 function renderCloseHistory(p) {
   const el = document.getElementById('close-history-list');
   if (!el) return;
-  const hist = (p.closeHistory || []).slice().sort((a,b) => a.date < b.date ? 1 : -1);
-  el.innerHTML = hist.length ? hist.map(h => `
-    <div class="guide-order">
-      <div class="order-left"><span class="o-desc">${h.date}</span></div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <input class="form-input" style="width:100px;padding:6px 8px" type="number" step="0.01" value="${h.price}" onchange="updateCloseHistoryPrice('${p.id}','${h.date}',this.value)" />
-        <button class="trade-act-btn trade-del-btn2" onclick="deleteCloseHistoryEntry('${p.id}','${h.date}')">×</button>
-      </div>
-    </div>`).join('') : '<div style="color:var(--text3);font-size:13px;padding:8px 0">기록된 종가가 없어요 — 시세 조회 시 자동 기록되거나, 아래에서 직접 추가할 수 있어요</div>';
+  const hist = p.closeHistory || [];
+  const srcLbl = { fill: '체결', pc: '전일종가', manual: '수동', legacy: '예전' };
+  const wd = ['일', '월', '화', '수', '목', '금', '토'];
+  const days = [];
+  let d = lastCompletedSession();
+  for (let i = 0; i < 10 && d; i++) { days.push(d); d = prevTradingDay(d); }
+  let html = '';
+  if (isReverseMode(p)) {
+    const l5 = calcL5(p);
+    if (l5.ok) {
+      html += `<div style="font-size:13px;color:var(--text2);margin-bottom:6px">L5 = $${l5.value.toFixed(2)} (사용 날짜 ${(l5.used || []).map(u => u.date.slice(5)).join(', ')})</div>`;
+    } else {
+      html += `<div style="font-size:13px;color:#f87171;margin-bottom:6px">종가 확인 필요: ${(l5.missing || []).join(', ')} — 입력하거나 휴장으로 표시하세요</div>`;
+    }
+  }
+  html += days.map(date => {
+    const h = hist.find(x => x.date === date);
+    const dt = new Date(date + 'T00:00:00Z');
+    const lbl = `${date.slice(5, 7)}/${date.slice(8, 10)} (${wd[dt.getUTCDay()]})`;
+    let right;
+    if (h && h.holiday) {
+      right = `<span style="font-size:13px;color:var(--text3)">휴장</span><button class="trade-act-btn trade-edit-btn" onclick="toggleCloseHoliday('${p.id}','${date}')">해제</button>`;
+    } else if (h && h.price > 0) {
+      right = `<span style="font-size:10px;color:var(--text4)">${srcLbl[h.src] || ''}</span>
+        <input class="form-input" style="width:90px;padding:6px 8px" type="number" step="0.01" value="${h.price}" onchange="updateCloseHistoryPrice('${p.id}','${date}',this.value)" />
+        <button class="trade-act-btn trade-del-btn2" onclick="deleteCloseHistoryEntry('${p.id}','${date}')">×</button>`;
+    } else {
+      right = `<input class="form-input" style="width:90px;padding:6px 8px" type="number" step="0.01" placeholder="비어 있음" onchange="updateCloseHistoryPrice('${p.id}','${date}',this.value)" />
+        <button class="trade-act-btn trade-edit-btn" onclick="toggleCloseHoliday('${p.id}','${date}')">휴장</button>`;
+    }
+    return `<div class="guide-order"><div class="order-left"><span class="o-desc">${lbl}</span></div><div style="display:flex;align-items:center;gap:6px">${right}</div></div>`;
+  }).join('');
+  el.innerHTML = html;
 }
 
+// 종가 직접 입력/수정 (미국 거래일 기준, 출처=manual — 체결가·pc보다 우선)
 async function updateCloseHistoryPrice(portId, date, val) {
   const p = state.portfolios.find(x => x.id === portId);
   if (!p) return;
   const price = parseFloat(val);
   if (!(price > 0)) { showToast('올바른 가격을 입력해주세요'); return; }
-  const h = (p.closeHistory || []).find(x => x.date === date);
-  if (h) h.price = price;
+  recordClose(p, date, centRound(price), 'manual');
+  evaluateReverseExits();
   openDetail(portId);
   await saveToGist();
   showToast('✓ 종가 수정 완료');
@@ -1661,6 +1953,21 @@ async function deleteCloseHistoryEntry(portId, date) {
   await saveToGist();
 }
 
+// 빈 평일을 휴장으로 표시(또는 해제) — L5 계산에서 그 날을 건너뛴다
+async function toggleCloseHoliday(portId, date) {
+  const p = state.portfolios.find(x => x.id === portId);
+  if (!p) return;
+  if (!p.closeHistory) p.closeHistory = [];
+  const h = p.closeHistory.find(x => x.date === date);
+  if (h && h.holiday) p.closeHistory = p.closeHistory.filter(x => x.date !== date);
+  else if (h) { h.holiday = true; h.price = null; h.src = 'manual'; }
+  else p.closeHistory.push({ date, price: null, src: 'manual', holiday: true });
+  trimCloses(p);
+  evaluateReverseExits();
+  openDetail(portId);
+  await saveToGist();
+}
+
 async function addCloseHistoryEntry() {
   const portId = document.getElementById('screen-detail')._portId;
   const p = state.portfolios.find(x => x.id === portId);
@@ -1668,12 +1975,9 @@ async function addCloseHistoryEntry() {
   const dateRaw = document.getElementById('ch-date').value;
   const price = parseFloat(document.getElementById('ch-price').value);
   if (!dateRaw || !(price > 0)) { showToast('날짜와 가격을 입력해주세요'); return; }
-  if (!p.closeHistory) p.closeHistory = [];
-  const idx = p.closeHistory.findIndex(x => x.date === dateRaw);
-  if (idx !== -1) p.closeHistory[idx].price = price;
-  else p.closeHistory.push({ date: dateRaw, price });
-  p.closeHistory.sort((a,b) => a.date < b.date ? -1 : 1);
-  if (p.closeHistory.length > 10) p.closeHistory = p.closeHistory.slice(-10);
+  if (!isTradingDay(dateRaw)) { showToast('미국 거래일(평일, 휴장일 제외) 날짜를 넣어주세요'); return; }
+  recordClose(p, dateRaw, centRound(price), 'manual');
+  evaluateReverseExits();
   document.getElementById('ch-price').value = '';
   openDetail(portId);
   await saveToGist();
@@ -1730,65 +2034,129 @@ function parseKakao(text) {
   document.getElementById('confirm-section').style.display = 'block';
   document.getElementById('success-box').style.display = 'none';
   toggleSellTypeUI('sell-type-section', 'sell-type-hint', matched[0]);
+  toggleBuyHintUI('buy-hint', matched[0], !parsedTrade || parsedTrade.type === '매수');
 }
 
 function onTargetPortChange() {
   const p = state.portfolios.find(x => x.id === document.getElementById('target-port').value);
   toggleSellTypeUI('sell-type-section', 'sell-type-hint', p);
+  toggleBuyHintUI('buy-hint', p, !parsedTrade || parsedTrade.type === '매수');
 }
 
-function roundT(x) { return Math.round(x * 1000) / 1000; }
-// 소진(리버스)모드 진입조건: T > D-1 (무한매수법 규칙 §8). 매수로만 T가 오르므로 매수 후에만 체크.
-function checkReverseEntry(p) {
-  if (p.mode !== 'reverse' && p.t_value > p.D - 1) {
+// ══════════════════════════════════════════════
+//  T값 — 미국 거래일 단위 정산 (무한매수법 규칙 §2, 리버스 §5)
+// ══════════════════════════════════════════════
+// 체결이 들어오는 순서대로 T를 바꾸면, 같은 날 체결 순서(예: 애프터장 지정가 매도가 LOC 매수보다
+// 늦게 도착)나 한 주문의 분할체결에 따라 결과가 달라진다. 그래서 "그날 시작 T"와 그날의 체결 종류만
+// 모아 두고, 매도 효과를 먼저 적용한 뒤 매수를 더해서 그날 T를 다시 계산한다.
+//   일반: 지정가 매도 있으면 ×0.25, 쿼터 매도만 있으면 ×0.75, 그다음 매수 증가분(+1/+0.5) 합산
+//   리버스: 매도 있으면 ×(1−2/D), 쿼터매수 본주문 있으면 +(D−T)×0.25 (하루 1회, 사다리는 무관)
+// p.tday = { key: 미국거래일, tStart, modeStart, quarter, limit, revSell, revBuy, buyInc }
+function recomputeDayT(p) {
+  const d = p.tday;
+  let T = d.tStart;
+  if (d.modeStart === 'reverse') {
+    if (d.revSell) T = T * (1 - 2 / p.D);
+    if (d.revBuy) T = T + (p.D - T) * 0.25;
+  } else {
+    if (d.limit) T = T * 0.25;
+    else if (d.quarter) T = T * 0.75;
+    T = T + d.buyInc;
+  }
+  p.t_value = T;
+}
+function applyDayEvent(p, usDate, t) {
+  if (!p.tday || p.tday.key !== usDate) {
+    p.tday = { key: usDate, tStart: p.t_value || 0, modeStart: p.mode || 'normal', quarter: false, limit: false, revSell: false, revBuy: false, buyInc: 0 };
+  }
+  const d = p.tday;
+  if (d.modeStart === 'reverse') {
+    if (t.type === '매도') {
+      if (!d.revSell) { d.revSell = true; p.reverseDayCount = (p.reverseDayCount || 0) + 1; } // 경과일은 거래일당 1회
+    } else if (t.tInc && t.tInc !== '+0') {
+      d.revBuy = true; // 리버스 매수: +0(사다리)이 아니면 쿼터매수 본주문
+    }
+  } else if (t.type === '매도') {
+    const st = t.sellType || '';
+    if (st.startsWith('지정가')) d.limit = true;
+    else if (st.startsWith('쿼터')) d.quarter = true;
+  } else {
+    d.buyInc += t.tInc === '+1' ? 1 : t.tInc === '+0.5' ? 0.5 : 0;
+  }
+  recomputeDayT(p);
+  // 소진(리버스) 진입: T > D−1 (규칙 리버스 §1). 그날은 일반 규칙으로 정산하고 다음 거래일부터 리버스.
+  if (d.modeStart !== 'reverse' && p.mode !== 'reverse' && p.t_value > p.D - 1) {
     p.mode = 'reverse';
     p.reverseDayCount = 0;
-  }
-}
-// 일반모드: 1회(+1)/절반(+0.5) 매수 체결. 리버스모드: 직전T + (D-직전T)×0.25 (규칙 §12)
-function applyBuyTInc(p, tInc) {
-  if (isReverseMode(p)) {
-    p.t_value = roundT(p.t_value + (p.D - p.t_value) * 0.25);
-  } else {
-    if (tInc === '+1') p.t_value = roundT(p.t_value + 1);
-    else if (tInc === '+0.5') p.t_value = roundT(p.t_value + 0.5);
-    checkReverseEntry(p);
-  }
-}
-// 일반모드: 쿼터매도(25%) 체결 시 T = 직전T × 0.75 (규칙 §2). 지정가매도(75%, 완전매도)는
-// 보유수량이 0이 되며 사이클 종료 로직이 T를 리셋하므로 여기서는 별도 처리하지 않음.
-// 리버스모드: 매도 체결 시 T = 직전T × (1-2/D) (규칙 §12), 리버스 경과일 +1.
-function applySellTInc(p, sellType) {
-  if (isReverseMode(p)) {
-    p.t_value = roundT(p.t_value * (1 - 2 / p.D));
-    p.reverseDayCount = (p.reverseDayCount || 0) + 1;
-  } else if ((sellType || '').startsWith('쿼터매도')) {
-    p.t_value = roundT(p.t_value * 0.75);
+    p.reverseSince = usDate;
+    p.reverseCheckedDate = usDate;
   }
 }
 
-// 거래 1건을 포트폴리오에 실제로 반영 (보유수량/평단/T값/사이클종료 판정).
+// 거래 1건을 포트폴리오에 반영 (보유수량/평단/T값/종가기록/사이클종료 대기).
 // confirmInput/confirmManualInput/자동입력(pollMeritz) 세 경로가 공유한다.
-// t: { date, type, price, qty, amount, fee, tInc, sellType }
+// t: { id, date, time, type, price, qty, amount, fee, tInc, sellType }
 function applyTradeToPortfolio(p, t) {
   if (!p.trades) p.trades = [];
-  // id는 파서(meritz) 경로에서만 존재(dedupKey 기반) — 완전 수동입력은 undefined로 남는다.
-  // pollMeritz()의 existingIds가 state.trades에서 id를 찾으므로, 여기서 빠뜨리면
-  // 자동입력된 거래를 "이미 처리했다"고 기억 못 해 같은 체결이 폴링마다 재적용된다.
-  const trade = { id:t.id, date:t.date, time:t.time, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
+  const usDate = tradeUsDate(t);
+  // id는 파서(meritz) 경로에서만 존재(dedupKey 기반) — pollMeritz()의 중복 판별에 쓰인다.
+  const trade = { id:t.id, date:t.date, time:t.time, usDate, type:t.type, price:t.price, qty:t.qty, amount:t.amount, fee:t.fee, tInc:t.tInc, sellType:t.sellType };
+  const late = p.tday && usDate < p.tday.key; // 이미 지난 거래일의 체결이 늦게 들어온 경우
   p.trades.push(trade);
   state.trades.push({ ...trade, portfolio:p.name, portfolioId:p.id, symbol:p.symbol });
-  if (t.type === '매수') {
-    const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
-    p.hold_qty += t.qty;
-    p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
-    applyBuyTInc(p, t.tInc);
-    if (p.hold_qty === 0 && p.t_value >= p.D) autoEndCycle(p);
+  const dayModeStart = (!late && p.tday && p.tday.key === usDate) ? p.tday.modeStart : p.mode;
+  if (late) {
+    recalcPortfolio(p); // 지난 날을 다시 정산하려면 처음부터 재생할 수밖에 없다
   } else {
-    p.hold_qty = Math.max(0, p.hold_qty - t.qty);
-    applySellTInc(p, t.sellType);
-    if (p.hold_qty === 0) { checkCycleEnd(p.id); }
+    if (t.type === '매수') {
+      const totalCost = p.avg_price * p.hold_qty + t.price * t.qty;
+      p.hold_qty += t.qty;
+      p.avg_price = p.hold_qty > 0 ? totalCost / p.hold_qty : 0;
+    } else {
+      p.hold_qty = Math.max(0, p.hold_qty - t.qty);
+      if (p.hold_qty === 0) p.avg_price = 0;
+    }
+    applyDayEvent(p, usDate, trade);
   }
+  // LOC·MOC 체결가는 그날 종가 그 자체 → 확정 종가로 기록 (지정가 매도는 장중 가격이라 제외)
+  if (t.type === '매수' || (t.sellType || '').startsWith('쿼터') || dayModeStart === 'reverse') {
+    recordFillClose(p, usDate, t.price, t.qty);
+  }
+  // 사이클 종료는 그 거래일 정산이 끝난 뒤(애프터장 마감 후)에도 보유 0이면 확인한다 — 지정가 매도로
+  // 보유가 0이 됐다가 같은 날 LOC 매수로 다시 생기는 경우가 있기 때문(원본 §7-2).
+  p.pendingCycleEnd = p.hold_qty === 0 ? usDate : null;
+}
+
+// 보유 0으로 끝난 거래일이 완전히 끝났으면 사이클 종료 확인창을 띄운다 (앱 실행당 포트폴리오별 1회)
+const _cycleEndPrompted = new Set();
+function checkPendingCycleEnds(now) {
+  const p = state.portfolios.find(x => !x.ended && x.hold_qty === 0 && x.pendingCycleEnd
+    && sessionDone(x.pendingCycleEnd, now) && !_cycleEndPrompted.has(x.id));
+  if (!p) return;
+  _cycleEndPrompted.add(p.id);
+  checkCycleEnd(p.id);
+}
+
+// 리버스 → 일반 복귀: 그 거래일 정산이 끝난 뒤 확정 종가로 하루 한 번 판정.
+// 조건: 종가 > 평단×(1−R%) (같으면 유지, 원본 "넘어서면"). 단 T > D−1이면 복귀하면 1회 매수금이
+// 잔금/(D−T)로 잔금보다 커지므로 리버스를 유지한다.
+function evaluateReverseExits(now) {
+  let changed = false;
+  state.portfolios.filter(p => !p.ended && isReverseMode(p)).forEach(p => {
+    const after = p.reverseCheckedDate || p.reverseSince || '';
+    const days = pricedCloses(p).filter(h => h.date > after && sessionDone(h.date, now))
+      .sort((a, b) => a.date < b.date ? -1 : 1);
+    if (!days.length) return;
+    const h = days[days.length - 1]; // 가장 최근에 끝난 거래일로 판정
+    p.reverseCheckedDate = h.date;
+    changed = true;
+    if (h.price > reverseExitPrice(p) && p.t_value <= p.D - 1) {
+      p.mode = 'normal';
+      p.reverseDayCount = 0;
+      p.reverseExitDate = h.date;
+    }
+  });
+  return changed;
 }
 
 async function confirmInput() {
@@ -1805,7 +2173,7 @@ async function confirmInput() {
   document.getElementById('parse-result').style.display = 'none';
   document.getElementById('confirm-section').style.display = 'none';
   document.getElementById('success-box').style.display = 'block';
-  document.getElementById('success-msg').textContent = `${p.name} ${t.type} ${t.qty}주 @ $${t.price.toFixed(2)}` + (t.type==='매수'?` · T=${p.t_value}`:'');
+  document.getElementById('success-msg').textContent = `${p.name} ${t.type} ${t.qty}주 @ $${t.price.toFixed(2)}` + (t.type==='매수'?` · T=${fmtT(p.t_value)}`:'');
   if (pendingConfirmId) {
     state.pending = state.pending.filter(x => x.id !== pendingConfirmId);
     pendingConfirmId = null;
@@ -1830,7 +2198,8 @@ function openManualInput(type) {
   document.getElementById('manual-port').innerHTML = state.portfolios
     .filter(p => !p.ended)
     .map(p => `<option value="${p.id}" ${p.id===pid?'selected':''}>${p.name} (${p.symbol})</option>`).join('');
-  document.getElementById('manual-date').value = localDateStr();
+  // 날짜는 미국 거래일 기준 — 기본값은 가장 최근에 끝난 미국 거래일
+  document.getElementById('manual-date').value = lastCompletedSession();
   document.getElementById('manual-qty').value = '';
   document.getElementById('manual-price').value = '';
   document.getElementById('manual-fee').value = '';
@@ -1841,6 +2210,7 @@ function openManualInput(type) {
 function onManualPortChange() {
   const p = state.portfolios.find(x => x.id === document.getElementById('manual-port').value);
   toggleSellTypeUI('sell-type-section-manual', 'sell-type-hint-manual', p);
+  toggleBuyHintUI('buy-hint-manual', p, true);
 }
 
 // ══════════════════════════════════════════════
@@ -1889,6 +2259,7 @@ async function endCycle() {
     if (profit > 0) p.seed = parseFloat((p.seed + profit / 2).toFixed(2));
     p.t_value = 0; p.avg_price = 0; p.hold_qty = 0; p.start_date = today; p.trades = []; p.mode = 'normal'; p.reverseDayCount = 0;
   }
+  p.tday = null; p.pendingCycleEnd = null; p.reverseSince = null; p.reverseCheckedDate = null;
   closeEndOverlay();
   renderAll();
   await saveToGist();
@@ -1954,6 +2325,7 @@ function resolvePendingInput(id) {
   document.getElementById('target-port').innerHTML = matched.map(p=>`<option value="${p.id}">${p.name} (${p.symbol})</option>`).join('');
   document.getElementById('confirm-section').style.display = 'block';
   toggleSellTypeUI('sell-type-section', 'sell-type-hint', matched[0]);
+  toggleBuyHintUI('buy-hint', matched[0], !parsedTrade || parsedTrade.type === '매수');
 }
 
 // ══════════════════════════════════════════════
@@ -2043,7 +2415,7 @@ function renderCycle() {
         <span class="badge badge-normal">진행 중</span>
       </div>
       <div class="grid3">
-        <div class="metric"><div class="m-label">T값</div><div class="m-val">${p.t_value}/${p.D}</div></div>
+        <div class="metric"><div class="m-label">T값</div><div class="m-val">${fmtT(p.t_value)}/${p.D}</div></div>
         <div class="metric"><div class="m-label">진행률</div><div class="m-val">${calcProg(p).toFixed(1)}%</div></div>
         <div class="metric"><div class="m-label">누적수익</div><div class="m-val" style="color:${p.acc_profit>=0?'var(--green)':'var(--red)'}">$${p.acc_profit}</div></div>
       </div>
@@ -2121,7 +2493,7 @@ function renderSettings() {
         <div class="pli-meta">V${p.version} · D=${p.D} · R=${p.R}% · $${p.seed.toLocaleString()}</div>
       </div>
       <div class="pli-right">
-        <span class="pli-t">T${p.t_value} (${calcProg(p).toFixed(0)}%)</span>
+        <span class="pli-t">T${fmtT(p.t_value)} (${calcProg(p).toFixed(0)}%)</span>
         <button class="edit-btn" onclick="openEditSheet('${p.id}')">⋮</button>
       </div>
     </div>`;
@@ -2146,6 +2518,8 @@ function renderSettings() {
   }
   const fki = document.getElementById('finnhub-key-input');
   if (fki && state.finnhubKey) fki.value = state.finnhubKey;
+  const fbk = document.getElementById('first-buy-k-input');
+  if (fbk && document.activeElement !== fbk) fbk.value = getSettings().firstBuyK;
 }
 
 // ══════════════════════════════════════════════
@@ -2303,9 +2677,9 @@ async function confirmManualInput() {
   const amount = price * qty + fee;
   const tIncVal = type === '매수' ? segs.tIncManual : undefined;
   const sellTypeVal = type === '매도' ? segs.sellTypeManual : undefined;
-  const willZeroOut = type === '매도' && Math.max(0, p.hold_qty - qty) === 0;
-  applyTradeToPortfolio(p, { date, type, price, qty, amount, fee, tInc: tIncVal, sellType: sellTypeVal });
-  if (willZeroOut) { closeManualOverlay(); return; } // checkCycleEnd가 이미 종료 오버레이를 열어둠
+  // 보유가 0이 돼도 사이클 종료 확인은 그 거래일이 끝난 뒤 띄운다(checkPendingCycleEnds)
+  const usDate = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : undefined;
+  applyTradeToPortfolio(p, { date, usDate, type, price, qty, amount, fee, tInc: tIncVal, sellType: sellTypeVal });
   closeManualOverlay();
   renderAll();
   await saveToGist();
@@ -2346,25 +2720,7 @@ async function deleteCycle(portId, start, end) {
 // 수정 대상 거래 "시점"의 모드를 재생으로 판정 (포트폴리오의 현재 모드와 다를 수 있음 —
 // 예: 지금은 정상모드로 복귀했어도 과거 특정 거래는 소진모드 중 발생했을 수 있음).
 function modeAtTradeIndex(p, idx) {
-  let tVal = 0, mode = 'normal';
-  for (let i = 0; i < idx; i++) {
-    const t = p.trades[i];
-    if (t.type === '매수') {
-      if (mode === 'reverse') {
-        tVal = roundT(tVal + (p.D - tVal) * 0.25);
-      } else {
-        const inc = t.tInc || '+0.5';
-        if (inc === '+1') tVal = roundT(tVal + 1);
-        else if (inc === '+0.5') tVal = roundT(tVal + 0.5);
-        if (tVal > p.D - 1) mode = 'reverse';
-      }
-    } else if (mode === 'reverse') {
-      tVal = roundT(tVal * (1 - 2 / p.D));
-    } else if ((t.sellType || '').startsWith('쿼터매도')) {
-      tVal = roundT(tVal * 0.75);
-    }
-  }
-  return mode;
+  return replayTrades(p, idx).mode;
 }
 
 function openTradeEdit(portId, tradeIdx) {
@@ -2381,7 +2737,7 @@ function openTradeEdit(portId, tradeIdx) {
   segs.editSellType = t.sellType || '쿼터매도 25%';
   setSegVal('editSellType', segs.editSellType);
   toggleSellTypeUI('edit-sell-type-section', 'edit-sell-type-hint', { mode: modeAtTradeIndex(p, tradeIdx) });
-  document.getElementById('edit-trade-date').value = toDateInput(t.date);
+  document.getElementById('edit-trade-date').value = tradeUsDate(t); // 미국 거래일 기준
   document.getElementById('edit-trade-qty').value = t.qty;
   document.getElementById('edit-trade-price').value = t.price;
   document.getElementById('edit-trade-fee').value = t.fee || 0;
@@ -2408,14 +2764,17 @@ async function saveTradeEdit() {
   const newPrice = parseFloat(document.getElementById('edit-trade-price').value) || 0;
   const newFee = parseFloat(document.getElementById('edit-trade-fee').value) || 0;
   const dateRaw = document.getElementById('edit-trade-date').value;
-  const dp = dateRaw.split('-');
-  const newDate = dp.length === 3 ? `${dp[1]}/${dp[2]}` : dateRaw;
+  // 날짜를 바꾼 경우에만 미국 거래일·표시 날짜를 새 값으로 (안 바꿨으면 원래 기록 유지)
+  const oldUs = tradeUsDate(oldTrade);
+  const dateChanged = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) && dateRaw !== oldUs;
+  const newDate = dateChanged ? `${dateRaw.slice(5, 7)}/${dateRaw.slice(8, 10)}` : oldTrade.date;
+  const newUsDate = dateChanged ? dateRaw : oldUs;
   const newAmount = newPrice * newQty + newFee;
   const newTInc = newType === '매수' ? segs.editTInc : undefined;
   const newSellType = newType === '매도' ? segs.editSellType : undefined;
   const si = state.trades.findIndex(x => x.portfolioId === editingTradePortId && x.date === oldTrade.date && x.type === oldTrade.type && x.price === oldTrade.price && x.qty === oldTrade.qty);
-  p.trades[editingTradeIdx] = { ...oldTrade, type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, tInc: newTInc, sellType: newSellType };
-  if (si !== -1) state.trades[si] = { ...state.trades[si], type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, tInc: newTInc, sellType: newSellType };
+  p.trades[editingTradeIdx] = { ...oldTrade, type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, usDate: newUsDate, tInc: newTInc, sellType: newSellType };
+  if (si !== -1) state.trades[si] = { ...state.trades[si], type: newType, qty: newQty, price: newPrice, fee: newFee, amount: newAmount, date: newDate, usDate: newUsDate, tInc: newTInc, sellType: newSellType };
   recalcPortfolio(p);
   closeTradeEditOverlay();
   openDetail(editingTradePortId);
@@ -2442,38 +2801,36 @@ async function deleteTrade(portId, tradeIdx) {
 // 주의: 리버스모드 이탈(가격 회복)은 시점별 종가 이력에 의존하는 판정이라 재생만으로는
 // 재현할 수 없음 — 과거 거래를 수정/삭제하면 이탈 이력이 사라져 모드가 어긋날 수 있는
 // 드문 엣지케이스가 있음.
-function recalcPortfolio(p) {
-  let qty = 0, avgPrice = 0, tVal = 0, mode = 'normal', reverseDayCount = 0;
-  (p.trades||[]).forEach(t => {
+// 거래 내역을 처음부터(또는 idx 직전까지) 재생해 상태를 구한다. 실시간 반영과 같은 하루 단위 정산
+// (applyDayEvent)을 그대로 쓴다. 단, 일반모드 복귀(가격 판정)는 거래가 아니라서 재생되지 않는다.
+function replayTrades(p, idx) {
+  const sim = { D: p.D, t_value: 0, mode: 'normal', reverseDayCount: 0, hold_qty: 0, avg_price: 0, tday: null, reverseSince: null, reverseCheckedDate: null };
+  const list = (p.trades || []).slice(0, idx === undefined ? undefined : idx);
+  list.forEach(t => {
     if (t.type === '매수') {
-      const totalCost = avgPrice * qty + t.price * t.qty;
-      qty += t.qty;
-      avgPrice = qty > 0 ? totalCost / qty : 0;
-      if (mode === 'reverse') {
-        tVal = roundT(tVal + (p.D - tVal) * 0.25);
-      } else {
-        const inc = t.tInc || '+0.5';
-        if (inc === '+1') tVal = roundT(tVal + 1);
-        else if (inc === '+0.5') tVal = roundT(tVal + 0.5);
-        // '+0': 변동 없음
-        if (tVal > p.D - 1) { mode = 'reverse'; reverseDayCount = 0; }
-      }
+      const totalCost = sim.avg_price * sim.hold_qty + t.price * t.qty;
+      sim.hold_qty += t.qty;
+      sim.avg_price = sim.hold_qty > 0 ? totalCost / sim.hold_qty : 0;
     } else {
-      qty = Math.max(0, qty - t.qty);
-      if (qty === 0) avgPrice = 0;
-      if (mode === 'reverse') {
-        tVal = roundT(tVal * (1 - 2 / p.D));
-        reverseDayCount++;
-      } else if ((t.sellType || '').startsWith('쿼터매도')) {
-        tVal = roundT(tVal * 0.75);
-      }
+      sim.hold_qty = Math.max(0, sim.hold_qty - t.qty);
+      if (sim.hold_qty === 0) sim.avg_price = 0;
     }
+    applyDayEvent(sim, tradeUsDate(t), t);
   });
-  p.hold_qty = qty;
-  p.avg_price = avgPrice;
-  p.t_value = tVal;
-  p.mode = mode;
-  p.reverseDayCount = reverseDayCount;
+  sim.lastUsDate = list.length ? tradeUsDate(list[list.length - 1]) : null;
+  return sim;
+}
+function recalcPortfolio(p) {
+  const sim = replayTrades(p);
+  p.hold_qty = sim.hold_qty;
+  p.avg_price = sim.avg_price;
+  p.t_value = sim.t_value;
+  p.mode = sim.mode;
+  p.reverseDayCount = sim.reverseDayCount;
+  p.tday = sim.tday;
+  p.reverseSince = sim.reverseSince;
+  p.reverseCheckedDate = sim.reverseCheckedDate;
+  p.pendingCycleEnd = (p.hold_qty === 0 && sim.lastUsDate) ? sim.lastUsDate : null;
 }
 
 // ══════════════════════════════════════════════
@@ -2565,10 +2922,11 @@ function verifyOrder(order, portId) {
   if (!p) return { ...order, status:'no_port', detail:'포트폴리오 없음' };
   if (p.symbol !== order.symbol) return { ...order, portName:p.name, status:'no_port', detail:`종목 불일치 (${p.symbol} 포트)` };
   const PRICE_TOL = 0.03;
-  const bp = calcBuyP(p), sp = calcStarP(p), sellP = calcSellP(p), ladder = ladderPrices(p);
+  const plan = buildOrderPlan(p);
   const candidates = order.type === '매수'
-    ? [{ label:'평단 LOC', price:p.avg_price, qty:avgQty(p) }, { label:'별가 LOC', price:bp, qty:starQty(p) }, ...ladder.map((l,i) => ({ label:`폭락${i+1}단`, price:l.price, qty:l.qty }))]
-    : [{ label:'25% LOC', price:sp, qty:sell25qty(p) }, { label:'75% 지정가', price:sellP, qty:sell75qty(p) }];
+    ? [...plan.mains.map(m => ({ label: m.label, price: m.price, qty: m.qty })), ...plan.ladder.map((l, i) => ({ label: `사다리 ${i + 1}단`, price: l.price, qty: l.qty }))]
+    : plan.sells.filter(x => x.price != null).map(x => ({ label: x.label, price: x.price, qty: x.qty }));
+  if (!candidates.length) return { ...order, portName: p.name, status: 'err', matched: '해당 주문 없음', calcPrice: 0, calcQty: 0, priceDiff: '-' };
   for (const cand of candidates) {
     const pOk = Math.abs(order.price - cand.price) <= PRICE_TOL;
     const qOk = order.qty === cand.qty;
